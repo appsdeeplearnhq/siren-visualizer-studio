@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Trash2 } from "lucide-react";
 import chevyTahoeImage from "@/assets/chevy-tahoe-front.jpg";
+import chevyTahoeTopImage from "@/assets/chevy-tahoe-top.png";
 
 interface PlacedLight {
   id: string;
