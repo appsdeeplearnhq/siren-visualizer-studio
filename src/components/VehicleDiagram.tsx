@@ -1,20 +1,10 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import html2canvas from "html2canvas";
-import jsPDF from 'jspdf';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Trash2 } from "lucide-react";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription, 
-  DialogFooter 
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import chevyTahoeImage from "@/assets/chevy-tahoe-front.jpg";
+import chevyTahoeFrontImage from "@/assets/chevy-tahoe-front.jpg";
+import chevyTahoeTopImage from "@/assets/chevy-tahoe-top.jpg";
 
 interface PlacedLight {
   id: string;
@@ -36,11 +26,11 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   const [placedLights, setPlacedLights] = useState<PlacedLight[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [vehicleImageLoaded, setVehicleImageLoaded] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [clientName, setClientName] = useState("");
-  
+
   // State to hold the light being dragged from its original position
   const [activelyDraggedLight, setActivelyDraggedLight] = useState<PlacedLight | null>(null);
+
+  const vehicleImage = view === 'top' ? chevyTahoeTopImage : chevyTahoeFrontImage;
 
   const getImageArea = useCallback(() => {
     const imageContainer = imageContainerRef.current;
@@ -135,51 +125,23 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   const clearAll = () => setPlacedLights([]);
   
   const handleExport = useCallback(async () => {
-    if (!clientName.trim()) {
-      alert("Please enter a client name.");
-      return;
-    }
-    
     const diagramElement = document.getElementById('vehicle-diagram-export-area');
     if (!diagramElement) {
       console.error("Export failed: Diagram element not found.");
-      setIsExporting(false);
       return;
     }
 
     try {
       const canvas = await html2canvas(diagramElement, {
-        backgroundColor: null,
+        backgroundColor: null, // Use transparent background
         logging: false,
-        useCORS: true,
+        useCORS: true // Important for external images
       });
-
-      // Create PDF
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'px',
-        format: [canvas.width, canvas.height]
-      });
-
-      // Add Client Name
-      const padding = 20;
-      pdf.setFontSize(20);
-      pdf.text(`Client: ${clientName}`, padding, padding + 20);
-
-      // Add Screenshot
-      const imgData = canvas.toDataURL('image/png');
-      pdf.addImage(imgData, 'PNG', 0, 60, canvas.width, canvas.height);
-      
-      // Save PDF
-      pdf.save(`SirenLayout_${clientName.replace(/\s/g, '_')}.pdf`);
-
+      onExport(canvas);
     } catch (error) {
       console.error("Export failed:", error);
-    } finally {
-      setIsExporting(false);
-      setClientName("");
     }
-  }, [onExport, clientName]);
+  }, [onExport]);
 
   return (
     <Card className="p-4 bg-card border-border flex-1" onDragEnd={handleDragEnd}>
@@ -189,38 +151,9 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
         </h3>
         <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={clearAll}><Trash2 className="w-4 h-4 mr-2" />Clear All</Button>
-            <Button size="sm" onClick={() => setIsExporting(true)}><Download className="w-4 h-4 mr-2" />Export</Button>
+            <Button size="sm" onClick={handleExport}><Download className="w-4 h-4 mr-2" />Export</Button>
         </div>
       </div>
-
-      <Dialog open={isExporting} onOpenChange={setIsExporting}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Enter Client Name</DialogTitle>
-            <DialogDescription>
-              Please enter the client's name to add it to the exported image.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="client-name" className="text-right">
-                Client Name
-              </Label>
-              <Input
-                id="client-name"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                className="col-span-3"
-                placeholder="e.g., John Doe"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsExporting(false)}>Cancel</Button>
-            <Button onClick={handleExport}>Confirm & Export</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       
       <div className="relative w-full h-full">
         <canvas
@@ -244,19 +177,19 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
             <img
               ref={imgRef}
               id="vehicle-img-dom"
-              src={chevyTahoeImage}
+              src={vehicleImage}
               alt="Vehicle"
               className="absolute object-contain"
               style={{ 
-                left: '50%', 
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
                 width: '100%',
                 height: '100%',
-              }}
-              onLoad={() => setVehicleImageLoaded(true)}
-            />
-            
+          }}
+          onLoad={() => setVehicleImageLoaded(true)}
+        />
+        
             {/* Render placed lights */}
             {placedLights.map(light => {
                 const imgArea = getImageArea();
@@ -303,7 +236,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
                 );
             })}
           </div>
-        </div>
+      </div>
       </div>
     </Card>
   );
