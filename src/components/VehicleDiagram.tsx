@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import html2canvas from "html2canvas";
+import jsPDF from 'jspdf';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Trash2 } from "lucide-react";
@@ -153,29 +154,25 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
         useCORS: true,
       });
 
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        const padding = Math.max(20, canvas.width / 50); // Add responsive padding
-        const fontSize = Math.max(24, canvas.width / 40); // Make font size responsive
-        
-        ctx.font = `bold ${fontSize}px Arial`;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'bottom';
+      // Create PDF
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
 
-        // Add a subtle shadow for better legibility
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-        ctx.shadowBlur = 4;
-        ctx.shadowOffsetX = 1;
-        ctx.shadowOffsetY = 1;
+      // Add Client Name
+      const padding = 20;
+      pdf.setFontSize(20);
+      pdf.text(`Client: ${clientName}`, padding, padding + 20);
 
-        const text = clientName;
-        const x = canvas.width - padding;
-        const y = canvas.height - padding;
-        ctx.fillText(text, x, y);
-      }
+      // Add Screenshot
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData, 'PNG', 0, 60, canvas.width, canvas.height);
       
-      onExport(canvas);
+      // Save PDF
+      pdf.save(`SirenLayout_${clientName.replace(/\s/g, '_')}.pdf`);
+
     } catch (error) {
       console.error("Export failed:", error);
     } finally {
