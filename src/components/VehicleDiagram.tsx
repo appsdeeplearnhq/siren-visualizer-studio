@@ -11,7 +11,6 @@ interface PlacedLight {
   type: string;
   xPct: number; // percentage (0-1) relative to image area
   yPct: number; // percentage (0-1) relative to image area
-  isDragging?: boolean;
 }
 
 interface VehicleDiagramProps {
@@ -94,19 +93,20 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   }, [activelyDraggedLight, vehicleImageLoaded]);
 
   const handleLightDragStart = useCallback((e: React.DragEvent, lightId: string) => {
-    setPlacedLights(prev => prev.map(l => l.id === lightId ? { ...l, isDragging: true } : l));
     const lightToDrag = placedLights.find(l => l.id === lightId);
     if (!lightToDrag) return;
-    
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', lightToDrag.type);
-    
     setActivelyDraggedLight(lightToDrag);
+    setPlacedLights(prev => prev.filter(l => l.id !== lightId));
   }, [placedLights]);
   
   const handleDragEnd = useCallback(() => {
-    setPlacedLights(prev => prev.map(l => l.isDragging ? { ...l, isDragging: false } : l));
-  }, []);
+    if (activelyDraggedLight) {
+      setPlacedLights(prev => [...prev, activelyDraggedLight]);
+      setActivelyDraggedLight(null);
+    }
+  }, [activelyDraggedLight]);
 
   const handleDragOver = (e: React.DragEvent) => e.preventDefault();
   const handleDragEnter = (e: React.DragEvent) => {
@@ -207,7 +207,6 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
                         top: `${imgArea.relativeY + light.yPct * imgArea.height}px`,
                         transform: 'translate(-50%, -50%)',
                         pointerEvents: 'auto',
-                        opacity: light.isDragging ? 0 : 1,
                       }}
                       draggable
                       onDragStart={(e) => handleLightDragStart(e, light.id)}
