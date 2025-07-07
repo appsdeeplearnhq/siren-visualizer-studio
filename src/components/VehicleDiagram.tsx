@@ -175,18 +175,18 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
             <img
               ref={imgRef}
               id="vehicle-img-dom"
-          src={chevyTahoeImage}
+              src={view === 'top' ? chevyTahoeTopImage : chevyTahoeImage}
               alt="Vehicle"
               className="absolute object-contain"
-          style={{ 
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
+              style={{ 
+                left: '50%', 
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
                 width: '100%',
                 height: '100%',
-          }}
-          onLoad={() => setVehicleImageLoaded(true)}
-        />
+              }}
+              onLoad={() => setVehicleImageLoaded(true)}
+            />
         
             {/* Render placed lights */}
             {placedLights.map(light => {
