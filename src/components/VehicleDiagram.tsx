@@ -92,27 +92,29 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     const dataType = e.dataTransfer.getData('text/plain');
     const imgRect = getImageArea();
     if (!imgRect) return;
-    // Center the light group under the cursor
+    // Center the group at the cursor
     let numCircles = 1;
     if (dataType === 'duo') numCircles = 2;
     if (dataType === 'trio') numCircles = 3;
-    const groupWidth = numCircles * LIGHT_SPACING;
-    const x = e.clientX - imgRect.x - groupWidth / 2 + LIGHT_SPACING / 2;
-    const y = e.clientY - imgRect.y - LIGHT_RADIUS;
-    const xPct = (x + groupWidth / 2 - LIGHT_SPACING / 2) / imgRect.width;
-    const yPct = (y + LIGHT_RADIUS) / imgRect.height;
+    const groupWidth = (numCircles - 1) * LIGHT_SPACING;
+    const x = e.clientX - imgRect.x;
+    const y = e.clientY - imgRect.y;
+    // The center of the group should be at the cursor
+    const xPct = (x) / imgRect.width;
+    const yPct = (y) / imgRect.height;
     if (dataType === 'placed-light' && draggedPlacedLight) {
       // Find the type of the dragged light
       const dragged = placedLights.find(l => l.id === draggedPlacedLight);
       let n = 1;
       if (dragged?.type === 'duo') n = 2;
       if (dragged?.type === 'trio') n = 3;
-      const groupW = n * LIGHT_SPACING;
-      const x2 = e.clientX - imgRect.x - groupW / 2 + LIGHT_SPACING / 2;
-      const xPct2 = (x2 + groupW / 2 - LIGHT_SPACING / 2) / imgRect.width;
+      const x2 = e.clientX - imgRect.x;
+      const y2 = e.clientY - imgRect.y;
+      const xPct2 = (x2) / imgRect.width;
+      const yPct2 = (y2) / imgRect.height;
       setPlacedLights(prev => prev.map(light =>
         light.id === draggedPlacedLight
-          ? { ...light, xPct: xPct2, yPct }
+          ? { ...light, xPct: xPct2, yPct: yPct2 }
           : light
       ));
       setDraggedPlacedLight(null);
