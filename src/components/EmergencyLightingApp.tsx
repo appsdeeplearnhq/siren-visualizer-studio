@@ -117,6 +117,7 @@ export const EmergencyLightingApp = () => {
               key={vehicle.id}
               vehicle={vehicle}
               onClick={handleVehicleSelect}
+              disabled={vehicle.id !== 'chevy-tahoe'}
             />
           ))}
         </div>

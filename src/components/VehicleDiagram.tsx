@@ -1,13 +1,15 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Trash2 } from "lucide-react";
+import chevyTahoeImage from "@/assets/chevy-tahoe-front.jpg";
 
 interface PlacedLight {
   id: string;
   type: string;
   x: number;
   y: number;
+  isDragging?: boolean;
 }
 
 interface VehicleDiagramProps {
@@ -21,6 +23,8 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   const [placedLights, setPlacedLights] = useState<PlacedLight[]>([]);
   const [draggedLight, setDraggedLight] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [draggedPlacedLight, setDraggedPlacedLight] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -81,6 +85,57 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     }
   };
 
+  const handleLightDragStart = (e: React.DragEvent, lightId: string) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (rect) {
+      const light = placedLights.find(l => l.id === lightId);
+      if (light) {
+        setDraggedPlacedLight(lightId);
+        setDragOffset({
+          x: e.clientX - rect.left - light.x,
+          y: e.clientY - rect.top - light.y
+        });
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', 'placed-light');
+      }
+    }
+  };
+
+  const handleCanvasDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const dataType = e.dataTransfer.getData('text/plain');
+    const rect = canvasRef.current?.getBoundingClientRect();
+    
+    if (!rect) return;
+    
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    if (dataType === 'placed-light' && draggedPlacedLight) {
+      // Moving existing light
+      const adjustedX = x - dragOffset.x;
+      const adjustedY = y - dragOffset.y;
+      
+      setPlacedLights(prev => prev.map(light => 
+        light.id === draggedPlacedLight 
+          ? { ...light, x: adjustedX, y: adjustedY }
+          : light
+      ));
+      setDraggedPlacedLight(null);
+    } else if (dataType !== 'placed-light') {
+      // Adding new light
+      const newLight: PlacedLight = {
+        id: Date.now().toString(),
+        type: dataType,
+        x,
+        y
+      };
+      setPlacedLights(prev => [...prev, newLight]);
+    }
+  };
+
   const renderLight = (light: PlacedLight) => {
     const colors = {
       solo: ['#ff0000'],
@@ -91,25 +146,28 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     return (
       <div
         key={light.id}
-        className="absolute cursor-pointer group"
+        className="absolute cursor-move group select-none"
         style={{
           left: light.x - 12,
           top: light.y - 12,
-          transform: 'translate(-50%, -50%)'
+          transform: 'translate(-50%, -50%)',
+          zIndex: draggedPlacedLight === light.id ? 1000 : 10
         }}
-        onClick={() => removeLight(light.id)}
+        draggable
+        onDragStart={(e) => handleLightDragStart(e, light.id)}
+        onDoubleClick={() => removeLight(light.id)}
       >
         <div className="flex gap-0.5">
           {colors[light.type as keyof typeof colors]?.map((color, index) => (
             <div
               key={index}
-              className="w-6 h-6 rounded-full border-2 border-white shadow-lg"
+              className="w-6 h-6 rounded-full border-2 border-white shadow-lg transition-transform group-hover:scale-110"
               style={{ backgroundColor: color }}
             />
           ))}
         </div>
-        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-          Click to remove
+        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          Drag to move • Double-click to remove
         </div>
       </div>
     );
@@ -141,24 +199,26 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
           className={`w-full border rounded-lg bg-muted transition-colors ${
             isDragOver ? 'border-primary bg-primary/5' : 'border-border'
           }`}
-          onDrop={handleDrop}
+          onDrop={handleCanvasDrop}
           onDragOver={handleDragOver}
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
           style={{ minHeight: '400px' }}
         />
         
-        {/* Vehicle outline placeholder - with pointer-events: none to allow drag through */}
-        <div 
-          className="absolute inset-4 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center"
-          style={{ pointerEvents: 'none' }}
-        >
-          <div className="text-center text-muted-foreground">
-            <div className="text-4xl mb-2">🚗</div>
-            <p className="text-sm">Vehicle diagram will appear here</p>
-            <p className="text-xs mt-1">Drag lights from the toolbox to place them</p>
-          </div>
-        </div>
+        {/* Vehicle Image */}
+        <img
+          src={chevyTahoeImage}
+          alt="Chevy Tahoe Front View"
+          className="absolute inset-4 w-auto h-auto max-w-full max-h-full object-contain m-auto"
+          style={{ 
+            pointerEvents: 'none',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)'
+          }}
+          draggable={false}
+        />
         
         {/* Placed lights */}
         {placedLights.map(renderLight)}

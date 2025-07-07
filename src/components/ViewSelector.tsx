@@ -19,16 +19,21 @@ export const ViewSelector = ({ selectedView, onViewSelect }: ViewSelectorProps) 
     <Card className="p-6 bg-card border-border">
       <h3 className="text-lg font-semibold mb-4 text-foreground">Select Vehicle View</h3>
       <div className="grid grid-cols-2 gap-3">
-        {views.map((view) => (
-          <Button
-            key={view.id}
-            variant={selectedView === view.id ? "default" : "secondary"}
-            onClick={() => onViewSelect(view.id)}
-            className="h-12"
-          >
-            {view.label}
-          </Button>
-        ))}
+        {views.map((view) => {
+          const isDisabled = view.id !== 'front';
+          return (
+            <Button
+              key={view.id}
+              variant={selectedView === view.id ? "default" : "secondary"}
+              onClick={() => !isDisabled && onViewSelect(view.id)}
+              className={`h-12 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={isDisabled}
+            >
+              {view.label}
+              {isDisabled && <span className="ml-2 text-xs">(Coming soon)</span>}
+            </Button>
+          );
+        })}
       </div>
     </Card>
   );
