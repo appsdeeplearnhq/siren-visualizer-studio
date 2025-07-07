@@ -3,8 +3,7 @@ import html2canvas from "html2canvas";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Trash2 } from "lucide-react";
-import chevyTahoeFrontImage from "@/assets/chevy-tahoe-front.jpg";
-import chevyTahoeTopImage from "@/assets/chevy-tahoe-top.jpg";
+import chevyTahoeImage from "@/assets/chevy-tahoe-front.jpg";
 
 interface PlacedLight {
   id: string;
@@ -28,9 +27,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   const [vehicleImageLoaded, setVehicleImageLoaded] = useState(false);
 
   // State to hold the light being dragged from its original position
-  const [draggedLightId, setDraggedLightId] = useState<string | null>(null);
-
-  const vehicleImage = view === 'top' ? chevyTahoeTopImage : chevyTahoeFrontImage;
+  const [activelyDraggedLight, setActivelyDraggedLight] = useState<PlacedLight | null>(null);
 
   const getImageArea = useCallback(() => {
     const imageContainer = imageContainerRef.current;
@@ -59,7 +56,8 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     const img = imgRef.current;
 
     if (!img || !vehicleImageLoaded) {
-        setDraggedLightId(null);
+        if(activelyDraggedLight) setPlacedLights(prev => [...prev, activelyDraggedLight]);
+        setActivelyDraggedLight(null);
         return;
     };
 
@@ -67,7 +65,8 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
 
     // Check if drop is within the image bounds
     if (e.clientX < imgRect.left || e.clientX > imgRect.right || e.clientY < imgRect.top || e.clientY > imgRect.bottom) {
-        setDraggedLightId(null);
+        if(activelyDraggedLight) setPlacedLights(prev => [...prev, activelyDraggedLight]);
+        setActivelyDraggedLight(null);
         return; 
     }
 
@@ -77,31 +76,38 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     const xPct = x_rel_img / imgRect.width;
     const yPct = y_rel_img / imgRect.height;
     
-    if (draggedLightId) {
-      // Redrag: update existing light
-      setPlacedLights(prev => prev.map(l => l.id === draggedLightId ? { ...l, xPct, yPct } : l));
-    } else {
-      // New light from toolbox
-      setPlacedLights(prev => [
-        ...prev,
-        { id: Date.now().toString(), type: dataType, xPct, yPct }
-      ]);
+    let lightToPlace: PlacedLight;
+    
+    if (activelyDraggedLight) { // This was a re-drag
+      lightToPlace = { ...activelyDraggedLight, xPct, yPct };
+    } else { // This is a new light from the toolbox
+      lightToPlace = { id: Date.now().toString(), type: dataType, xPct, yPct };
     }
-    setDraggedLightId(null);
+    
+    setPlacedLights(prev => [...prev, lightToPlace]);
+    setActivelyDraggedLight(null);
 
-  }, [draggedLightId, vehicleImageLoaded]);
+  }, [activelyDraggedLight, vehicleImageLoaded]);
 
   const handleLightDragStart = useCallback((e: React.DragEvent, lightId: string) => {
     const lightToDrag = placedLights.find(l => l.id === lightId);
     if (!lightToDrag) return;
+    
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', lightToDrag.type);
-    setDraggedLightId(lightId);
+    
+    setActivelyDraggedLight(lightToDrag);
+    setPlacedLights(prev => prev.filter(l => l.id !== lightId));
+
   }, [placedLights]);
   
-  const handleDragEnd = useCallback(() => {
-    setDraggedLightId(null);
-  }, []);
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
+    // If the drag ended without a successful drop, put the light back
+    if (activelyDraggedLight) {
+        setPlacedLights(prev => [...prev, activelyDraggedLight]);
+        setActivelyDraggedLight(null);
+    }
+  }, [activelyDraggedLight]);
 
   const handleDragOver = (e: React.DragEvent) => e.preventDefault();
   const handleDragEnter = (e: React.DragEvent) => {
@@ -168,10 +174,10 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
             <img
               ref={imgRef}
               id="vehicle-img-dom"
-              src={vehicleImage}
+          src={chevyTahoeImage}
               alt="Vehicle"
               className="absolute object-contain"
-              style={{ 
+          style={{ 
             left: '50%',
             top: '50%',
             transform: 'translate(-50%, -50%)',
@@ -202,7 +208,6 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
                         top: `${imgArea.relativeY + light.yPct * imgArea.height}px`,
                         transform: 'translate(-50%, -50%)',
                         pointerEvents: 'auto',
-                        opacity: draggedLightId === light.id ? 0 : 1,
                       }}
                       draggable
                       onDragStart={(e) => handleLightDragStart(e, light.id)}

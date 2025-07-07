@@ -20,7 +20,7 @@ export const ViewSelector = ({ selectedView, onViewSelect }: ViewSelectorProps) 
       <h3 className="text-lg font-semibold mb-4 text-foreground">Select Vehicle View</h3>
       <div className="grid grid-cols-2 gap-3">
         {views.map((view) => {
-          const isDisabled = !['front', 'top'].includes(view.id);
+          const isDisabled = view.id !== 'front' && view.id !== 'top';
           return (
             <Button
               key={view.id}
