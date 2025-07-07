@@ -57,7 +57,9 @@ export const LightingToolbox = ({ onLightSelect }: LightingToolboxProps) => {
               dragImage.style.top = '-1000px';
               dragImage.style.left = '-1000px';
               
-              e.dataTransfer.setDragImage(dragImage, 40, 20);
+              // Center the drag image on the cursor
+              const rect = dragImage.getBoundingClientRect();
+              e.dataTransfer.setDragImage(dragImage, rect.width / 2, rect.height / 2);
               
               setTimeout(() => {
                 if (document.body.contains(dragImage)) {
