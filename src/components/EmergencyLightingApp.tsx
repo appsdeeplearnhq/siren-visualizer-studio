@@ -6,9 +6,10 @@ import { VehicleCard } from "./VehicleCard";
 import { ViewSelector } from "./ViewSelector";
 import { LightingToolbox } from "./LightingToolbox";
 import { VehicleDiagram } from "./VehicleDiagram";
+import { StartupPage } from "./StartupPage";
 import { toast } from "sonner";
 
-type AppStep = 'home' | 'vehicle-selection' | 'view-selection' | 'lighting-layout';
+type AppStep = 'startup' | 'home' | 'vehicle-selection' | 'view-selection' | 'lighting-layout';
 
 const vehicles = [
   { id: 'chevy-tahoe', name: 'Chevrolet Tahoe', model: 'PPV', category: 'SUV' },
@@ -18,7 +19,7 @@ const vehicles = [
 ];
 
 export const EmergencyLightingApp = () => {
-  const [currentStep, setCurrentStep] = useState<AppStep>('home');
+  const [currentStep, setCurrentStep] = useState<AppStep>('startup');
   const [selectedVehicle, setSelectedVehicle] = useState<string>('');
   const [selectedView, setSelectedView] = useState<string>('');
 
@@ -34,6 +35,10 @@ export const EmergencyLightingApp = () => {
 
   const handleStartNewLayout = () => {
     setCurrentStep('vehicle-selection');
+  };
+
+  const handleStartDemo = () => {
+    setCurrentStep('home');
   };
 
   const handleBack = () => {
@@ -174,6 +179,8 @@ export const EmergencyLightingApp = () => {
   );
 
   switch (currentStep) {
+    case 'startup':
+      return <StartupPage onStartDemo={handleStartDemo} />;
     case 'home':
       return renderHome();
     case 'vehicle-selection':
@@ -183,6 +190,6 @@ export const EmergencyLightingApp = () => {
     case 'lighting-layout':
       return renderLightingLayout();
     default:
-      return renderHome();
+      return <StartupPage onStartDemo={handleStartDemo} />;
   }
 };

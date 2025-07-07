@@ -25,6 +25,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   const [isDragOver, setIsDragOver] = useState(false);
   const [draggedPlacedLight, setDraggedPlacedLight] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [vehicleImageLoaded, setVehicleImageLoaded] = useState(false);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -79,8 +80,78 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     setPlacedLights([]);
   };
 
-  const handleExport = () => {
+  const drawCanvasContent = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#f1f5f9'; // muted background
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw vehicle image
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    return new Promise<void>((resolve) => {
+      img.onload = () => {
+        // Calculate centered position and size
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const padding = 32;
+        const maxWidth = canvasWidth - padding;
+        const maxHeight = canvasHeight - padding;
+        
+        let { width: imgWidth, height: imgHeight } = img;
+        
+        // Scale image to fit within canvas with padding
+        const scale = Math.min(maxWidth / imgWidth, maxHeight / imgHeight);
+        imgWidth *= scale;
+        imgHeight *= scale;
+        
+        const x = (canvasWidth - imgWidth) / 2;
+        const y = (canvasHeight - imgHeight) / 2;
+        
+        ctx.drawImage(img, x, y, imgWidth, imgHeight);
+
+        // Draw lights
+        placedLights.forEach(light => {
+          const colors = {
+            solo: ['#ff0000'],
+            duo: ['#ff0000', '#0000ff'],
+            trio: ['#ff0000', '#0000ff', '#ffffff']
+          };
+
+          const lightColors = colors[light.type as keyof typeof colors] || ['#ff0000'];
+          
+          lightColors.forEach((color, index) => {
+            const lightX = light.x + (index * 25) - (lightColors.length * 12.5);
+            const lightY = light.y;
+            
+            // Draw light circle
+            ctx.beginPath();
+            ctx.arc(lightX, lightY, 12, 0, 2 * Math.PI);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          });
+        });
+
+        resolve();
+      };
+      
+      img.src = chevyTahoeImage;
+    });
+  };
+
+  const handleExport = async () => {
     if (canvasRef.current) {
+      await drawCanvasContent();
       onExport(canvasRef.current);
     }
   };
@@ -220,6 +291,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
             maxHeight: 'calc(100% - 32px)'
           }}
           draggable={false}
+          onLoad={() => setVehicleImageLoaded(true)}
         />
         
         {/* Placed lights */}
