@@ -9,7 +9,6 @@ interface PlacedLight {
   type: string;
   xPct: number; // percentage (0-1) relative to image area
   yPct: number; // percentage (0-1) relative to image area
-  isDragging?: boolean;
 }
 
 interface VehicleDiagramProps {
@@ -20,68 +19,113 @@ interface VehicleDiagramProps {
 
 export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null); // Ref for the DOM image
+  const imgRef = useRef<HTMLImageElement>(null);
   const [placedLights, setPlacedLights] = useState<PlacedLight[]>([]);
-  const [draggedLight, setDraggedLight] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [draggedPlacedLight, setDraggedPlacedLight] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [vehicleImageLoaded, setVehicleImageLoaded] = useState(false);
-  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
-  const [isReDragging, setIsReDragging] = useState(false);
+  
+  // State to hold the light being dragged from its original position
+  const [activelyDraggedLight, setActivelyDraggedLight] = useState<PlacedLight | null>(null);
 
-  // Add a global dragend listener to reset state
-  useEffect(() => {
-    const handleDragEnd = () => {
-      setIsReDragging(false);
-      setDraggedPlacedLight(null);
-    };
-    document.addEventListener('dragend', handleDragEnd);
-    return () => document.removeEventListener('dragend', handleDragEnd);
-  }, []);
-
-  // Handle canvas resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (canvasRef.current) {
-        const rect = canvasRef.current.getBoundingClientRect();
-        setCanvasSize({ width: rect.width, height: rect.height });
-      }
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Helper to get image area in DOM (match canvas logic)
   const getImageArea = useCallback(() => {
-    const container = canvasRef.current; // Use canvas as the container
+    const container = canvasRef.current;
     const img = imgRef.current;
-    if (!container || !img || !vehicleImageLoaded) return null;
+    if (!container || !img || !vehicleImageLoaded || img.naturalWidth === 0) return null;
+    
     const containerRect = container.getBoundingClientRect();
-    let imgWidth = img.naturalWidth;
-    let imgHeight = img.naturalHeight;
-    if (imgWidth === 0 || imgHeight === 0) return null;
     const padding = 32;
     const maxWidth = containerRect.width - padding;
     const maxHeight = containerRect.height - padding;
-    const scale = Math.min(maxWidth / imgWidth, maxHeight / imgHeight);
-    imgWidth *= scale;
-    imgHeight *= scale;
-    const imageX = (containerRect.width - imgWidth) / 2;
-    const imageY = (containerRect.height - imgHeight) / 2;
+    
+    const scale = Math.min(maxWidth / img.naturalWidth, maxHeight / img.naturalHeight);
+    const imgWidth = img.naturalWidth * scale;
+    const imgHeight = img.naturalHeight * scale;
+    
+    const relativeX = (containerRect.width - imgWidth) / 2;
+    const relativeY = (containerRect.height - imgHeight) / 2;
+    
     return {
-      x: containerRect.left + imageX,
-      y: containerRect.top + imageY,
       width: imgWidth,
       height: imgHeight,
-      relativeX: imageX,
-      relativeY: imageY,
+      relativeX,
+      relativeY,
     };
   }, [vehicleImageLoaded]);
 
-  // Helper to get image area in canvas
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    const dataType = e.dataTransfer.getData('text/plain');
+    const imgArea = getImageArea();
+    const canvas = canvasRef.current;
+    if (!imgArea || !canvas) {
+        if(activelyDraggedLight) setPlacedLights(prev => [...prev, activelyDraggedLight]);
+        setActivelyDraggedLight(null);
+        return;
+    };
+
+    const canvasRect = canvas.getBoundingClientRect();
+    const dropX = e.clientX - canvasRect.left;
+    const dropY = e.clientY - canvasRect.top;
+
+    const x_rel_img = dropX - imgArea.relativeX;
+    const y_rel_img = dropY - imgArea.relativeY;
+
+    if (x_rel_img < 0 || x_rel_img > imgArea.width || y_rel_img < 0 || y_rel_img > imgArea.height) {
+        if(activelyDraggedLight) setPlacedLights(prev => [...prev, activelyDraggedLight]);
+        setActivelyDraggedLight(null);
+        return; 
+    }
+
+    const xPct = x_rel_img / imgArea.width;
+    const yPct = y_rel_img / imgArea.height;
+    
+    let lightToPlace: PlacedLight;
+    
+    if (activelyDraggedLight) { // This was a re-drag
+      lightToPlace = { ...activelyDraggedLight, xPct, yPct };
+    } else { // This is a new light from the toolbox
+      lightToPlace = { id: Date.now().toString(), type: dataType, xPct, yPct };
+    }
+    
+    setPlacedLights(prev => [...prev, lightToPlace]);
+    setActivelyDraggedLight(null);
+
+  }, [getImageArea, activelyDraggedLight]);
+
+  const handleLightDragStart = useCallback((e: React.DragEvent, lightId: string) => {
+    const lightToDrag = placedLights.find(l => l.id === lightId);
+    if (!lightToDrag) return;
+    
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', lightToDrag.type);
+    
+    setActivelyDraggedLight(lightToDrag);
+    setPlacedLights(prev => prev.filter(l => l.id !== lightId));
+
+  }, [placedLights]);
+  
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
+    // If the drag ended without a successful drop, put the light back
+    if (activelyDraggedLight) {
+        setPlacedLights(prev => [...prev, activelyDraggedLight]);
+        setActivelyDraggedLight(null);
+    }
+  }, [activelyDraggedLight]);
+
+  const handleDragOver = (e: React.DragEvent) => e.preventDefault();
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+  const removeLight = (lightId: string) => setPlacedLights(prev => prev.filter(light => light.id !== lightId));
+  const clearAll = () => setPlacedLights([]);
+  
   const getCanvasImageArea = (canvas: HTMLCanvasElement, img: HTMLImageElement) => {
     const padding = 32;
     const canvasWidth = canvas.width;
@@ -97,258 +141,148 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     return { x: imageX, y: imageY, width: imgWidth, height: imgHeight };
   };
 
-  // Unified drop handler using relative coordinates
-  const LIGHT_RADIUS = 12; // px, must match canvas and DOM
-  const LIGHT_SPACING = 25; // px, must match canvas and DOM
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    setIsReDragging(false);
-    const dataType = e.dataTransfer.getData('text/plain');
-    const imgArea = getImageArea();
-    if (!imgArea) return;
-    const dropX = e.nativeEvent.offsetX;
-    const dropY = e.nativeEvent.offsetY;
-    const x_rel_img = dropX - imgArea.relativeX;
-    const y_rel_img = dropY - imgArea.relativeY;
-    if (x_rel_img < 0 || x_rel_img > imgArea.width || y_rel_img < 0 || y_rel_img > imgArea.height) {
-      return; // Drop was outside the image
-    }
-    const xPct = x_rel_img / imgArea.width;
-    const yPct = y_rel_img / imgArea.height;
-    if (dataType === 'placed-light' && draggedPlacedLight) {
-      // Find the type of the dragged light
-      const dragged = placedLights.find(l => l.id === draggedPlacedLight);
-      let n = 1;
-      if (dragged?.type === 'duo') n = 2;
-      if (dragged?.type === 'trio') n = 3;
-      const x2 = dropX - imgArea.relativeX;
-      const y2 = dropY - imgArea.relativeY;
-      const xPct2 = x2 / imgArea.width;
-      const yPct2 = y2 / imgArea.height;
-      setPlacedLights(prev => prev.map(light =>
-        light.id === draggedPlacedLight
-          ? { ...light, xPct: xPct2, yPct: yPct2 }
-          : light
-      ));
-      setDraggedPlacedLight(null);
-    } else if (dataType && dataType !== 'placed-light') {
-      const newLight: PlacedLight = {
-        id: Date.now().toString(),
-        type: dataType,
-        xPct,
-        yPct
-      };
-      setPlacedLights(prev => [...prev, newLight]);
-    }
-  }, [draggedPlacedLight, placedLights, getImageArea]);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-  }, []);
-
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    // Only set dragOver to false if we're leaving the canvas entirely
-    if (e.currentTarget.contains(e.relatedTarget as Node)) {
-      return;
-    }
-    setIsDragOver(false);
-  }, []);
-
-  const removeLight = useCallback((lightId: string) => {
-    setPlacedLights(prev => prev.filter(light => light.id !== lightId));
-  }, []);
-
-  const clearAll = useCallback(() => {
-    setPlacedLights([]);
-  }, []);
-
   const handleExport = useCallback(async () => {
-    const img = new window.Image();
-    img.crossOrigin = 'anonymous';
+    const exportCanvas = document.createElement('canvas');
+    const img = imgRef.current;
+    if (!img || !vehicleImageLoaded) return;
+    
+    const vehicleImg = new Image();
+    vehicleImg.crossOrigin = "Anonymous";
+    vehicleImg.src = chevyTahoeImage;
 
-    img.onload = () => {
-      // Create a new canvas with the image's exact dimensions
-      const exportCanvas = document.createElement('canvas');
-      exportCanvas.width = img.naturalWidth;
-      exportCanvas.height = img.naturalHeight;
-
-      const ctx = exportCanvas.getContext('2d');
-      if (!ctx) {
-        console.error('Failed to get canvas context for export');
-        return;
-      }
-
-      // Draw the vehicle image to fill the canvas
-      ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
-
-      // Draw the lights on the new canvas
-      placedLights.forEach(light => {
-        const colors = {
-          solo: ['#ff0000'],
-          duo: ['#ff0000', '#0000ff'],
-          trio: ['#ff0000', '#0000ff', '#ffffff']
-        };
-        const lightColors = colors[light.type as keyof typeof colors] || ['#ff0000'];
-        const px = light.xPct * exportCanvas.width;
-        const py = light.yPct * exportCanvas.height;
+    vehicleImg.onload = () => {
+        exportCanvas.width = vehicleImg.naturalWidth;
+        exportCanvas.height = vehicleImg.naturalHeight;
+        const ctx = exportCanvas.getContext('2d');
+        if (!ctx) return;
         
-        // Scale light size and spacing based on export resolution for consistency
-        const displayWidth = imgRef.current?.getBoundingClientRect().width || 800;
-        const scale = exportCanvas.width / displayWidth;
-        const lightRadius = 12 * scale;
-        const lightSpacing = 25 * scale;
-        const lineWidth = 2 * scale;
+        // Draw the vehicle image to fill the canvas
+        ctx.drawImage(vehicleImg, 0, 0, exportCanvas.width, exportCanvas.height);
 
-        lightColors.forEach((color, index) => {
-          const groupWidth = (lightColors.length - 1) * lightSpacing;
-          const lightX = px + (index * lightSpacing) - (groupWidth / 2);
-          const lightY = py;
-          
-          ctx.beginPath();
-          ctx.arc(lightX, lightY, lightRadius, 0, 2 * Math.PI);
-          ctx.fillStyle = color;
-          ctx.fill();
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = lineWidth;
-          ctx.stroke();
+        // Draw the lights
+        placedLights.forEach(light => {
+            const LIGHT_RADIUS = (24 / 2) * (exportCanvas.width / (getImageArea()?.width || exportCanvas.width));
+            const LIGHT_SPACING = (25) * (exportCanvas.width / (getImageArea()?.width || exportCanvas.width));
+            
+            const x = light.xPct * exportCanvas.width;
+            const y = light.yPct * exportCanvas.height;
+
+            const colors = {
+                solo: ['#ff0000'],
+                duo: ['#ff0000', '#0000ff'],
+                trio: ['#ff0000', '#0000ff', '#ffffff']
+            };
+            const lightColors = colors[light.type as keyof typeof colors] || [];
+            const n = lightColors.length;
+            const totalWidth = (n - 1) * LIGHT_SPACING;
+            
+            for (let i = 0; i < n; i++) {
+                ctx.beginPath();
+                const circleX = x - totalWidth / 2 + i * LIGHT_SPACING;
+                ctx.arc(circleX, y, LIGHT_RADIUS, 0, 2 * Math.PI, false);
+                ctx.fillStyle = lightColors[i];
+                ctx.fill();
+                ctx.lineWidth = 2 * (exportCanvas.width / (getImageArea()?.width || exportCanvas.width));
+                ctx.strokeStyle = '#fff';
+                ctx.stroke();
+            }
         });
-      });
-      
-      onExport(exportCanvas);
+        
+        onExport(exportCanvas);
     };
-
-    img.onerror = () => {
-      console.error('Failed to load image for export');
+    vehicleImg.onerror = () => {
+        console.error("Failed to load vehicle image for export.");
     };
-
-    img.src = chevyTahoeImage;
-  }, [placedLights, onExport]);
-
-  // Drag start for DOM
-  const handleLightDragStart = useCallback((e: React.DragEvent, lightId: string) => {
-    setDraggedPlacedLight(lightId);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', 'placed-light');
-    setTimeout(() => setIsReDragging(true), 0);
-  }, []);
-
-  // DOM render helper
-  const renderLight = useCallback((light: PlacedLight) => {
-    const imgArea = getImageArea();
-    if (!imgArea) return null;
-    const colors = {
-      solo: ['#ff0000'],
-      duo: ['#ff0000', '#0000ff'],
-      trio: ['#ff0000', '#0000ff', '#ffffff']
-    };
-    const lightColors = colors[light.type as keyof typeof colors] || ['#ff0000'];
-    const lightGroupWidth = (lightColors.length - 1) * 25 + 24;
-    return (
-      <div
-        key={light.id}
-        className="absolute cursor-move group select-none"
-        style={{
-          left: `${light.xPct * 100}%`,
-          top: `${light.yPct * 100}%`,
-          transform: 'translate(-50%, -50%)',
-          zIndex: 20, // ensure lights are on top
-          opacity: isReDragging && draggedPlacedLight === light.id ? 0 : 1,
-        }}
-        draggable
-        onDragStart={(e) => handleLightDragStart(e, light.id)}
-        onDoubleClick={() => removeLight(light.id)}
-      >
-        <div className="flex items-center" style={{ gap: '1px', width: lightGroupWidth, pointerEvents: 'none' }}>
-          {lightColors.map((color, index) => (
-            <div
-              key={index}
-              style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                backgroundColor: color,
-                border: '2px solid #fff',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-              }}
-              className="transition-transform group-hover:scale-110"
-            />
-          ))}
-        </div>
-        <div
-          className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100"
-          style={{ pointerEvents: 'none', zIndex: 1 }}
-        >
-          Drag to move • Double-click to remove
-        </div>
-      </div>
-    );
-  }, [draggedPlacedLight, getImageArea, handleLightDragStart, removeLight, isReDragging]);
+  }, [placedLights, onExport, vehicleImageLoaded, getImageArea]);
 
   return (
-    <Card className="p-4 bg-card border-border flex-1">
+    <Card className="p-4 bg-card border-border flex-1" onDragEnd={handleDragEnd}>
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold text-foreground">
           {vehicle} - {view.charAt(0).toUpperCase() + view.slice(1)} View
         </h3>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={clearAll}>
-            <Trash2 className="w-4 h-4 mr-2" />
-            Clear All
-          </Button>
-          <Button size="sm" onClick={handleExport}>
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
+            <Button variant="outline" size="sm" onClick={clearAll}><Trash2 className="w-4 h-4 mr-2" />Clear All</Button>
+            <Button size="sm" onClick={handleExport}><Download className="w-4 h-4 mr-2" />Export</Button>
         </div>
       </div>
       
-      <div className="relative" id="vehicle-img-container">
+      <div className="relative w-full h-full">
         <canvas
           ref={canvasRef}
           width={800}
           height={600}
-          className={`w-full border rounded-lg bg-muted transition-colors ${
-            isDragOver ? 'border-primary bg-primary/5' : 'border-border'
-          }`}
+          className={`w-full border rounded-lg bg-muted transition-colors ${ isDragOver ? 'border-primary bg-primary/5' : 'border-border' }`}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
           style={{ minHeight: '400px' }}
         />
-        {/* Vehicle Image */}
-        <img
-          ref={imgRef}
-          id="vehicle-img-dom"
-          src={chevyTahoeImage}
-          alt="Chevy Tahoe Front View"
-          className="absolute w-auto h-auto object-contain"
-          style={{ 
-            pointerEvents: 'none',
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
-            maxWidth: 'calc(100% - 32px)',
-            maxHeight: 'calc(100% - 32px)'
-          }}
-          draggable={false}
-          onLoad={() => setVehicleImageLoaded(true)}
-          onError={() => setVehicleImageLoaded(false)}
-        />
+        
         <div className="absolute top-0 left-0 w-full h-full" style={{ pointerEvents: 'none' }}>
-          {placedLights.map(renderLight)}
+            <img
+              ref={imgRef}
+              id="vehicle-img-dom"
+              src={chevyTahoeImage}
+              alt="Vehicle"
+              className="absolute object-contain"
+              style={{ 
+                left: '50%', 
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                maxWidth: 'calc(100% - 64px)',
+                maxHeight: 'calc(100% - 64px)',
+              }}
+              onLoad={() => setVehicleImageLoaded(true)}
+            />
+            
+            {/* Render placed lights */}
+            {placedLights.map(light => {
+                const imgArea = getImageArea();
+                if (!imgArea) return null;
+
+                const colors = {
+                    solo: ['#ff0000'],
+                    duo: ['#ff0000', '#0000ff'],
+                    trio: ['#ff0000', '#0000ff', '#ffffff']
+                };
+                const lightColors = colors[light.type as keyof typeof colors] || [];
+
+                return (
+                    <div
+                      key={light.id}
+                      className="absolute cursor-move group"
+                      style={{
+                        left: `${imgArea.relativeX + light.xPct * imgArea.width}px`,
+                        top: `${imgArea.relativeY + light.yPct * imgArea.height}px`,
+                        transform: 'translate(-50%, -50%)',
+                        pointerEvents: 'auto',
+                      }}
+                      draggable
+                      onDragStart={(e) => handleLightDragStart(e, light.id)}
+                      onDoubleClick={() => removeLight(light.id)}
+                    >
+                      <div className="flex items-center" style={{ gap: '1px' }}>
+                        {lightColors.map((color, index) => (
+                          <div
+                            key={index}
+                            style={{
+                              width: '24px', height: '24px', borderRadius: '50%',
+                              backgroundColor: color, border: '2px solid #fff',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                            }}
+                            className="transition-transform group-hover:scale-110"
+                          />
+                        ))}
+                      </div>
+                      <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap">
+                        Drag to move • Double-click to remove
+                      </div>
+                    </div>
+                );
+            })}
         </div>
-      </div>
-      
-      <div className="mt-4 text-sm text-muted-foreground">
-        Lights placed: {placedLights.length}
       </div>
     </Card>
   );
