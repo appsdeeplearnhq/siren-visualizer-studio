@@ -216,7 +216,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
                       onDragStart={(e) => handleLightDragStart(e, light.id)}
                       onDoubleClick={() => removeLight(light.id)}
                     >
-                      <div className={`flex items-center ${view === 'top' ? 'flex-col' : ''}`} style={{ gap: '1px' }}>
+                      <div className="flex items-center" style={{ gap: '1px' }}>
                         {lightColors.map((color, index) => (
                           <div
                             key={index}
