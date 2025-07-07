@@ -164,7 +164,10 @@ export const EmergencyLightingApp = () => {
         
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-1">
-            <LightingToolbox onLightSelect={handleLightSelect} />
+            <LightingToolbox 
+              onLightSelect={handleLightSelect}
+              view={selectedView} 
+            />
           </div>
           <div className="lg:col-span-3">
             <VehicleDiagram
