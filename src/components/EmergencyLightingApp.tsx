@@ -166,6 +166,7 @@ export const EmergencyLightingApp = () => {
           <div className="lg:col-span-1">
             <LightingToolbox 
               onLightSelect={handleLightSelect}
+              view={selectedView}
             />
           </div>
           <div className="lg:col-span-3">
