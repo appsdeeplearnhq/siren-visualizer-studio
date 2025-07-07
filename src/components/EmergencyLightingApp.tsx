@@ -90,7 +90,7 @@ export const EmergencyLightingApp = () => {
           onClick={handleStartNewLayout}
           className="h-14 text-lg"
         >
-          Select Vehicle
+          Start New Layout
         </Button>
         
         <Button 
@@ -99,7 +99,7 @@ export const EmergencyLightingApp = () => {
           className="h-14 text-lg"
           disabled
         >
-          Start New Layout
+          Load Saved Layout (Coming Soon)
         </Button>
       </div>
     </div>

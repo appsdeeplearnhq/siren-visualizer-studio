@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Trash2 } from "lucide-react";
@@ -26,165 +26,24 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   const [draggedPlacedLight, setDraggedPlacedLight] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [vehicleImageLoaded, setVehicleImageLoaded] = useState(false);
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const lightType = e.dataTransfer.getData('text/plain');
-    const rect = canvasRef.current?.getBoundingClientRect();
-    
-    console.log('Drop event:', { lightType, rect });
-    
-    if (rect && lightType) {
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      console.log('Placing light at:', { x, y });
-      
-      const newLight: PlacedLight = {
-        id: Date.now().toString(),
-        type: lightType,
-        x,
-        y
-      };
-      
-      setPlacedLights(prev => [...prev, newLight]);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-    console.log('Drag enter');
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    // Only set dragOver to false if we're leaving the canvas entirely
-    if (e.currentTarget.contains(e.relatedTarget as Node)) {
-      return;
-    }
-    setIsDragOver(false);
-    console.log('Drag leave');
-  };
-
-  const removeLight = (lightId: string) => {
-    setPlacedLights(prev => prev.filter(light => light.id !== lightId));
-  };
-
-  const clearAll = () => {
-    setPlacedLights([]);
-  };
-
-  const drawCanvasContent = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#f1f5f9'; // muted background
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw vehicle image
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    
-    return new Promise<void>((resolve) => {
-      img.onload = () => {
-        // Get canvas dimensions and calculate scale
-        const canvasRect = canvas.getBoundingClientRect();
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        const displayWidth = canvasRect.width;
-        const displayHeight = canvasRect.height;
-        
-        // Calculate scale factors for positioning
-        const scaleX = canvasWidth / displayWidth;
-        const scaleY = canvasHeight / displayHeight;
-        
-        const padding = 32;
-        const maxWidth = canvasWidth - padding;
-        const maxHeight = canvasHeight - padding;
-        
-        let { width: imgWidth, height: imgHeight } = img;
-        
-        // Scale image to fit within canvas with padding
-        const scale = Math.min(maxWidth / imgWidth, maxHeight / imgHeight);
-        imgWidth *= scale;
-        imgHeight *= scale;
-        
-        const imageX = (canvasWidth - imgWidth) / 2;
-        const imageY = (canvasHeight - imgHeight) / 2;
-        
-        ctx.drawImage(img, imageX, imageY, imgWidth, imgHeight);
-
-        // Draw lights with correct positioning
-        placedLights.forEach(light => {
-          const colors = {
-            solo: ['#ff0000'],
-            duo: ['#ff0000', '#0000ff'],
-            trio: ['#ff0000', '#0000ff', '#ffffff']
-          };
-
-          const lightColors = colors[light.type as keyof typeof colors] || ['#ff0000'];
-          
-          // Convert display coordinates to canvas coordinates
-          const canvasX = light.x * scaleX;
-          const canvasY = light.y * scaleY;
-          
-          lightColors.forEach((color, index) => {
-            const lightX = canvasX + (index * 25 * scaleX) - (lightColors.length * 12.5 * scaleX);
-            const lightY = canvasY;
-            
-            // Draw light circle
-            ctx.beginPath();
-            ctx.arc(lightX, lightY, 12 * scaleX, 0, 2 * Math.PI);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2 * scaleX;
-            ctx.stroke();
-          });
-        });
-
-        resolve();
-      };
-      
-      img.src = chevyTahoeImage;
-    });
-  };
-
-  const handleExport = async () => {
-    if (canvasRef.current) {
-      await drawCanvasContent();
-      onExport(canvasRef.current);
-    }
-  };
-
-  const handleLightDragStart = (e: React.DragEvent, lightId: string) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (rect) {
-      const light = placedLights.find(l => l.id === lightId);
-      if (light) {
-        setDraggedPlacedLight(lightId);
-        setDragOffset({
-          x: e.clientX - rect.left - light.x,
-          y: e.clientY - rect.top - light.y
-        });
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', 'placed-light');
+  // Handle canvas resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect();
+        setCanvasSize({ width: rect.width, height: rect.height });
       }
-    }
-  };
+    };
 
-  const handleCanvasDrop = (e: React.DragEvent) => {
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Unified drop handler
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     
@@ -207,7 +66,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
           : light
       ));
       setDraggedPlacedLight(null);
-    } else if (dataType !== 'placed-light') {
+    } else if (dataType && dataType !== 'placed-light') {
       // Adding new light
       const newLight: PlacedLight = {
         id: Date.now().toString(),
@@ -217,9 +76,152 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
       };
       setPlacedLights(prev => [...prev, newLight]);
     }
-  };
+  }, [draggedPlacedLight, dragOffset]);
 
-  const renderLight = (light: PlacedLight) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    // Only set dragOver to false if we're leaving the canvas entirely
+    if (e.currentTarget.contains(e.relatedTarget as Node)) {
+      return;
+    }
+    setIsDragOver(false);
+  }, []);
+
+  const removeLight = useCallback((lightId: string) => {
+    setPlacedLights(prev => prev.filter(light => light.id !== lightId));
+  }, []);
+
+  const clearAll = useCallback(() => {
+    setPlacedLights([]);
+  }, []);
+
+  const drawCanvasContent = useCallback(async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#f1f5f9'; // muted background
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw vehicle image
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    return new Promise<void>((resolve, reject) => {
+      img.onload = () => {
+        try {
+          // Get canvas dimensions and calculate scale
+          const canvasRect = canvas.getBoundingClientRect();
+          const canvasWidth = canvas.width;
+          const canvasHeight = canvas.height;
+          const displayWidth = canvasRect.width;
+          const displayHeight = canvasRect.height;
+          
+          // Calculate scale factors for positioning
+          const scaleX = canvasWidth / displayWidth;
+          const scaleY = canvasHeight / displayHeight;
+          
+          const padding = 32;
+          const maxWidth = canvasWidth - padding;
+          const maxHeight = canvasHeight - padding;
+          
+          let { width: imgWidth, height: imgHeight } = img;
+          
+          // Scale image to fit within canvas with padding
+          const scale = Math.min(maxWidth / imgWidth, maxHeight / imgHeight);
+          imgWidth *= scale;
+          imgHeight *= scale;
+          
+          const imageX = (canvasWidth - imgWidth) / 2;
+          const imageY = (canvasHeight - imgHeight) / 2;
+          
+          ctx.drawImage(img, imageX, imageY, imgWidth, imgHeight);
+
+          // Draw lights with correct positioning
+          placedLights.forEach(light => {
+            const colors = {
+              solo: ['#ff0000'],
+              duo: ['#ff0000', '#0000ff'],
+              trio: ['#ff0000', '#0000ff', '#ffffff']
+            };
+
+            const lightColors = colors[light.type as keyof typeof colors] || ['#ff0000'];
+            
+            // Convert display coordinates to canvas coordinates
+            const canvasX = light.x * scaleX;
+            const canvasY = light.y * scaleY;
+            
+            lightColors.forEach((color, index) => {
+              const lightX = canvasX + (index * 25 * scaleX) - (lightColors.length * 12.5 * scaleX);
+              const lightY = canvasY;
+              
+              // Draw light circle
+              ctx.beginPath();
+              ctx.arc(lightX, lightY, 12 * scaleX, 0, 2 * Math.PI);
+              ctx.fillStyle = color;
+              ctx.fill();
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 2 * scaleX;
+              ctx.stroke();
+            });
+          });
+
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      img.onerror = () => {
+        reject(new Error('Failed to load vehicle image'));
+      };
+      
+      img.src = chevyTahoeImage;
+    });
+  }, [placedLights]);
+
+  const handleExport = useCallback(async () => {
+    if (canvasRef.current) {
+      try {
+        await drawCanvasContent();
+        onExport(canvasRef.current);
+      } catch (error) {
+        console.error('Export failed:', error);
+        // You could add a toast notification here
+      }
+    }
+  }, [drawCanvasContent, onExport]);
+
+  const handleLightDragStart = useCallback((e: React.DragEvent, lightId: string) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (rect) {
+      const light = placedLights.find(l => l.id === lightId);
+      if (light) {
+        setDraggedPlacedLight(lightId);
+        setDragOffset({
+          x: e.clientX - rect.left - light.x,
+          y: e.clientY - rect.top - light.y
+        });
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', 'placed-light');
+      }
+    }
+  }, [placedLights]);
+
+  const renderLight = useCallback((light: PlacedLight) => {
     const colors = {
       solo: ['#ff0000'],
       duo: ['#ff0000', '#0000ff'],
@@ -254,7 +256,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
         </div>
       </div>
     );
-  };
+  }, [draggedPlacedLight, handleLightDragStart, removeLight]);
 
   return (
     <Card className="p-4 bg-card border-border flex-1">
@@ -282,7 +284,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
           className={`w-full border rounded-lg bg-muted transition-colors ${
             isDragOver ? 'border-primary bg-primary/5' : 'border-border'
           }`}
-          onDrop={handleCanvasDrop}
+          onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
@@ -304,6 +306,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
           }}
           draggable={false}
           onLoad={() => setVehicleImageLoaded(true)}
+          onError={() => setVehicleImageLoaded(false)}
         />
         
         {/* Placed lights */}
