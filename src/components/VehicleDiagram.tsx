@@ -21,6 +21,7 @@ interface VehicleDiagramProps {
 export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+  const imageContainerRef = useRef<HTMLDivElement>(null); // Ref for the image's direct container
   const [placedLights, setPlacedLights] = useState<PlacedLight[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [vehicleImageLoaded, setVehicleImageLoaded] = useState(false);
@@ -29,25 +30,19 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   const [activelyDraggedLight, setActivelyDraggedLight] = useState<PlacedLight | null>(null);
 
   const getImageArea = useCallback(() => {
-    const container = canvasRef.current;
+    const imageContainer = imageContainerRef.current;
     const img = imgRef.current;
-    if (!container || !img || !vehicleImageLoaded || img.naturalWidth === 0) return null;
-    
-    const containerRect = container.getBoundingClientRect();
-    const padding = 32; // Padding on a single side
-    const maxWidth = containerRect.width - padding * 2; // Apply padding to both sides
-    const maxHeight = containerRect.height - padding * 2; // Apply padding to top and bottom
-    
-    const scale = Math.min(maxWidth / img.naturalWidth, maxHeight / img.naturalHeight);
-    const imgWidth = img.naturalWidth * scale;
-    const imgHeight = img.naturalHeight * scale;
-    
-    const relativeX = (containerRect.width - imgWidth) / 2;
-    const relativeY = (containerRect.height - imgHeight) / 2;
+    if (!imageContainer || !img || !vehicleImageLoaded) return null;
+
+    const containerRect = imageContainer.getBoundingClientRect();
+    const imgRect = img.getBoundingClientRect();
+
+    const relativeX = imgRect.left - containerRect.left;
+    const relativeY = imgRect.top - containerRect.top;
     
     return {
-      width: imgWidth,
-      height: imgHeight,
+      width: imgRect.width,
+      height: imgRect.height,
       relativeX,
       relativeY,
     };
@@ -58,29 +53,28 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     setIsDragOver(false);
 
     const dataType = e.dataTransfer.getData('text/plain');
-    const imgArea = getImageArea();
-    const canvas = canvasRef.current;
-    if (!imgArea || !canvas) {
+    const img = imgRef.current;
+
+    if (!img || !vehicleImageLoaded) {
         if(activelyDraggedLight) setPlacedLights(prev => [...prev, activelyDraggedLight]);
         setActivelyDraggedLight(null);
         return;
     };
 
-    const canvasRect = canvas.getBoundingClientRect();
-    const dropX = e.clientX - canvasRect.left;
-    const dropY = e.clientY - canvasRect.top;
+    const imgRect = img.getBoundingClientRect();
 
-    const x_rel_img = dropX - imgArea.relativeX;
-    const y_rel_img = dropY - imgArea.relativeY;
-
-    if (x_rel_img < 0 || x_rel_img > imgArea.width || y_rel_img < 0 || y_rel_img > imgArea.height) {
+    // Check if drop is within the image bounds
+    if (e.clientX < imgRect.left || e.clientX > imgRect.right || e.clientY < imgRect.top || e.clientY > imgRect.bottom) {
         if(activelyDraggedLight) setPlacedLights(prev => [...prev, activelyDraggedLight]);
         setActivelyDraggedLight(null);
         return; 
     }
 
-    const xPct = x_rel_img / imgArea.width;
-    const yPct = y_rel_img / imgArea.height;
+    const x_rel_img = e.clientX - imgRect.left;
+    const y_rel_img = e.clientY - imgRect.top;
+
+    const xPct = x_rel_img / imgRect.width;
+    const yPct = y_rel_img / imgRect.height;
     
     let lightToPlace: PlacedLight;
     
@@ -93,7 +87,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     setPlacedLights(prev => [...prev, lightToPlace]);
     setActivelyDraggedLight(null);
 
-  }, [getImageArea, activelyDraggedLight]);
+  }, [activelyDraggedLight, vehicleImageLoaded]);
 
   const handleLightDragStart = useCallback((e: React.DragEvent, lightId: string) => {
     const lightToDrag = placedLights.find(l => l.id === lightId);
@@ -176,7 +170,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
           className="absolute top-0 left-0 w-full h-full p-8 flex items-center justify-center"
           style={{ pointerEvents: 'none' }}
         >
-          <div className="relative w-full h-full">
+          <div className="relative w-full h-full" ref={imageContainerRef}>
             <img
               ref={imgRef}
               id="vehicle-img-dom"
