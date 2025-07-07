@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Download, Trash2 } from "lucide-react";
 import chevyTahoeFrontImage from "@/assets/chevy-tahoe-front.jpg";
 import chevyTahoeTopImage from "@/assets/chevy-tahoe-top.jpg";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PlacedLight {
   id: string;
@@ -144,14 +145,18 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   }, [onExport]);
 
   return (
-    <Card className="p-4 bg-card border-border flex-1" onDragEnd={handleDragEnd}>
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-foreground">
+    <Card className="p-2 sm:p-4 bg-card border-border flex-1" onDragEnd={handleDragEnd}>
+      <div className="flex justify-between items-center mb-2 sm:mb-4">
+        <h3 className="text-base sm:text-lg font-semibold text-foreground">
           {vehicle} - {view.charAt(0).toUpperCase() + view.slice(1)} View
         </h3>
         <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={clearAll}><Trash2 className="w-4 h-4 mr-2" />Clear All</Button>
-            <Button size="sm" onClick={handleExport}><Download className="w-4 h-4 mr-2" />Export</Button>
+            <Button variant="outline" size="sm" onClick={clearAll} data-clear-all>
+              <Trash2 className="w-4 h-4 mr-2" />Clear All
+            </Button>
+            <Button size="sm" onClick={handleExport} data-export>
+              <Download className="w-4 h-4 mr-2" />Export
+            </Button>
         </div>
       </div>
       
