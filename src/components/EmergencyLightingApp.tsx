@@ -8,7 +8,6 @@ import { LightingToolbox } from "./LightingToolbox";
 import { VehicleDiagram } from "./VehicleDiagram";
 import { StartupPage } from "./StartupPage";
 import { toast } from "sonner";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 type AppStep = 'startup' | 'home' | 'vehicle-selection' | 'view-selection' | 'lighting-layout';
 
@@ -23,7 +22,6 @@ export const EmergencyLightingApp = () => {
   const [currentStep, setCurrentStep] = useState<AppStep>('startup');
   const [selectedVehicle, setSelectedVehicle] = useState<string>('');
   const [selectedView, setSelectedView] = useState<string>('');
-  const isMobile = useIsMobile();
 
   const handleVehicleSelect = (vehicleId: string) => {
     setSelectedVehicle(vehicleId);
@@ -153,92 +151,32 @@ export const EmergencyLightingApp = () => {
     </div>
   );
 
-  const renderLightingLayout = () => {
-    // State for mobile toolbox drawer
-    const [toolboxOpen, setToolboxOpen] = useState(false);
-
-    return (
-      <div className="min-h-screen bg-background p-2 sm:p-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center gap-4 mb-4 sm:mb-6">
-            <Button variant="ghost" onClick={handleBack} className="min-h-[44px] min-w-[44px]">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-            <h2 className="text-2xl font-bold text-foreground">Lighting Layout Editor</h2>
+  const renderLightingLayout = () => (
+    <div className="min-h-screen bg-background p-4">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="ghost" onClick={handleBack}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          <h2 className="text-2xl font-bold text-foreground">Lighting Layout Editor</h2>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-1">
+            <LightingToolbox onLightSelect={handleLightSelect} />
           </div>
-
-          {/* Responsive layout: toolbox below diagram on mobile, left on desktop */}
-          <div className="flex flex-col-reverse lg:grid lg:grid-cols-4 gap-4 sm:gap-6">
-            {/* Toolbox: Drawer on mobile, always visible on desktop */}
-            <div className="lg:col-span-1">
-              <div className="hidden lg:block">
-                <LightingToolbox onLightSelect={handleLightSelect} />
-              </div>
-              {/* Mobile FAB to open toolbox */}
-              <div className="fixed bottom-6 right-6 z-50 lg:hidden">
-                <Button
-                  className="rounded-full shadow-lg h-14 w-14 p-0 flex items-center justify-center"
-                  onClick={() => setToolboxOpen(true)}
-                  aria-label="Open Toolbox"
-                  variant="default"
-                >
-                  <Zap className="w-7 h-7" />
-                </Button>
-              </div>
-              {/* Mobile Drawer */}
-              {toolboxOpen && (
-                <div className="fixed inset-0 z-50 bg-black/40 flex items-end" onClick={() => setToolboxOpen(false)}>
-                  <div
-                    className="w-full bg-card rounded-t-2xl p-4 max-h-[80vh] overflow-y-auto"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <h3 className="text-lg font-semibold">Emergency Lights</h3>
-                      <Button size="sm" variant="ghost" onClick={() => setToolboxOpen(false)}>Close</Button>
-                    </div>
-                    <LightingToolbox onLightSelect={handleLightSelect} />
-                  </div>
-                </div>
-              )}
-            </div>
-            {/* Diagram */}
-            <div className="lg:col-span-3 flex flex-col">
-              <VehicleDiagram
-                view={selectedView}
-                vehicle={getSelectedVehicleName()}
-                onExport={handleExport}
-              />
-              {/* Sticky actions on mobile */}
-              <div className="lg:hidden sticky bottom-0 left-0 w-full flex gap-2 bg-background/90 p-2 z-40 border-t border-border mt-2">
-                <Button 
-                  variant="outline" 
-                  size="lg" 
-                  className="flex-1 min-h-[44px] min-w-[44px]" 
-                  onClick={() => {
-                    const clearButton = document.querySelector('[data-clear-all]') as HTMLButtonElement;
-                    if (clearButton) clearButton.click();
-                  }}
-                >
-                  Clear All
-                </Button>
-                <Button 
-                  size="lg" 
-                  className="flex-1 min-h-[44px] min-w-[44px]" 
-                  onClick={() => {
-                    const exportButton = document.querySelector('[data-export]') as HTMLButtonElement;
-                    if (exportButton) exportButton.click();
-                  }}
-                >
-                  Export
-                </Button>
-              </div>
-            </div>
+          <div className="lg:col-span-3">
+            <VehicleDiagram
+              view={selectedView}
+              vehicle={getSelectedVehicleName()}
+              onExport={handleExport}
+            />
           </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
   switch (currentStep) {
     case 'startup':
