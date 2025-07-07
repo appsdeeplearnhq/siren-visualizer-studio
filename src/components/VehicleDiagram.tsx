@@ -169,64 +169,67 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     setPlacedLights([]);
   }, []);
 
-  // Canvas export logic
-  const drawCanvasContent = useCallback(async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#f1f5f9';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const handleExport = useCallback(async () => {
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
-    return new Promise<void>((resolve, reject) => {
-      img.onload = () => {
-        try {
-          const area = getCanvasImageArea(canvas, img);
-          ctx.drawImage(img, area.x, area.y, area.width, area.height);
-          placedLights.forEach(light => {
-            const colors = {
-              solo: ['#ff0000'],
-              duo: ['#ff0000', '#0000ff'],
-              trio: ['#ff0000', '#0000ff', '#ffffff']
-            };
-            const lightColors = colors[light.type as keyof typeof colors] || ['#ff0000'];
-            const px = area.x + light.xPct * area.width;
-            const py = area.y + light.yPct * area.height;
-            lightColors.forEach((color, index) => {
-              const lightX = px + (index * 25) - (lightColors.length * 12.5);
-              const lightY = py;
-              ctx.beginPath();
-              ctx.arc(lightX, lightY, 12, 0, 2 * Math.PI);
-              ctx.fillStyle = color;
-              ctx.fill();
-              ctx.strokeStyle = '#ffffff';
-              ctx.lineWidth = 2;
-              ctx.stroke();
-            });
-          });
-          resolve();
-        } catch (error) {
-          reject(error);
-        }
-      };
-      img.onerror = () => reject(new Error('Failed to load vehicle image'));
-      img.src = chevyTahoeImage;
-    });
-  }, [placedLights]);
 
-  const handleExport = useCallback(async () => {
-    if (canvasRef.current) {
-      try {
-        await drawCanvasContent();
-        onExport(canvasRef.current);
-      } catch (error) {
-        console.error('Export failed:', error);
-        // You could add a toast notification here
+    img.onload = () => {
+      // Create a new canvas with the image's exact dimensions
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = img.naturalWidth;
+      exportCanvas.height = img.naturalHeight;
+
+      const ctx = exportCanvas.getContext('2d');
+      if (!ctx) {
+        console.error('Failed to get canvas context for export');
+        return;
       }
-    }
-  }, [drawCanvasContent, onExport]);
+
+      // Draw the vehicle image to fill the canvas
+      ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
+
+      // Draw the lights on the new canvas
+      placedLights.forEach(light => {
+        const colors = {
+          solo: ['#ff0000'],
+          duo: ['#ff0000', '#0000ff'],
+          trio: ['#ff0000', '#0000ff', '#ffffff']
+        };
+        const lightColors = colors[light.type as keyof typeof colors] || ['#ff0000'];
+        const px = light.xPct * exportCanvas.width;
+        const py = light.yPct * exportCanvas.height;
+        
+        // Scale light size and spacing based on export resolution for consistency
+        const displayWidth = imgRef.current?.getBoundingClientRect().width || 800;
+        const scale = exportCanvas.width / displayWidth;
+        const lightRadius = 12 * scale;
+        const lightSpacing = 25 * scale;
+        const lineWidth = 2 * scale;
+
+        lightColors.forEach((color, index) => {
+          const groupWidth = (lightColors.length - 1) * lightSpacing;
+          const lightX = px + (index * lightSpacing) - (groupWidth / 2);
+          const lightY = py;
+          
+          ctx.beginPath();
+          ctx.arc(lightX, lightY, lightRadius, 0, 2 * Math.PI);
+          ctx.fillStyle = color;
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = lineWidth;
+          ctx.stroke();
+        });
+      });
+      
+      onExport(exportCanvas);
+    };
+
+    img.onerror = () => {
+      console.error('Failed to load image for export');
+    };
+
+    img.src = chevyTahoeImage;
+  }, [placedLights, onExport]);
 
   // Drag start for DOM
   const handleLightDragStart = useCallback((e: React.DragEvent, lightId: string) => {
