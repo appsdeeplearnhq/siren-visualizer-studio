@@ -20,15 +20,21 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [placedLights, setPlacedLights] = useState<PlacedLight[]>([]);
   const [draggedLight, setDraggedLight] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    setIsDragOver(false);
     const lightType = e.dataTransfer.getData('text/plain');
     const rect = canvasRef.current?.getBoundingClientRect();
+    
+    console.log('Drop event:', { lightType, rect });
     
     if (rect && lightType) {
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
+      
+      console.log('Placing light at:', { x, y });
       
       const newLight: PlacedLight = {
         id: Date.now().toString(),
@@ -43,6 +49,22 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+    console.log('Drag enter');
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    // Only set dragOver to false if we're leaving the canvas entirely
+    if (e.currentTarget.contains(e.relatedTarget as Node)) {
+      return;
+    }
+    setIsDragOver(false);
+    console.log('Drag leave');
   };
 
   const removeLight = (lightId: string) => {
@@ -116,14 +138,21 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
           ref={canvasRef}
           width={800}
           height={600}
-          className="w-full border border-border rounded-lg bg-muted"
+          className={`w-full border rounded-lg bg-muted transition-colors ${
+            isDragOver ? 'border-primary bg-primary/5' : 'border-border'
+          }`}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
           style={{ minHeight: '400px' }}
         />
         
-        {/* Vehicle outline placeholder */}
-        <div className="absolute inset-4 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center">
+        {/* Vehicle outline placeholder - with pointer-events: none to allow drag through */}
+        <div 
+          className="absolute inset-4 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center"
+          style={{ pointerEvents: 'none' }}
+        >
           <div className="text-center text-muted-foreground">
             <div className="text-4xl mb-2">🚗</div>
             <p className="text-sm">Vehicle diagram will appear here</p>
