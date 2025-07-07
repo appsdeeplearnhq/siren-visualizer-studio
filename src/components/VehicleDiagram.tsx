@@ -42,12 +42,29 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Helper to get image area in DOM
+  // Helper to get image area in DOM (match canvas logic)
   const getImageArea = () => {
+    const container = document.getElementById('vehicle-img-container');
     const img = document.getElementById('vehicle-img-dom') as HTMLImageElement;
-    if (!img) return null;
-    const rect = img.getBoundingClientRect();
-    return rect;
+    if (!container || !img) return null;
+    const containerRect = container.getBoundingClientRect();
+    // Use naturalWidth/naturalHeight for scaling
+    let imgWidth = img.naturalWidth;
+    let imgHeight = img.naturalHeight;
+    const padding = 32;
+    const maxWidth = containerRect.width - padding;
+    const maxHeight = containerRect.height - padding;
+    const scale = Math.min(maxWidth / imgWidth, maxHeight / imgHeight);
+    imgWidth *= scale;
+    imgHeight *= scale;
+    const imageX = (containerRect.width - imgWidth) / 2;
+    const imageY = (containerRect.height - imgHeight) / 2;
+    return {
+      x: containerRect.left + imageX,
+      y: containerRect.top + imageY,
+      width: imgWidth,
+      height: imgHeight
+    };
   };
 
   // Helper to get image area in canvas
@@ -73,8 +90,8 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     const dataType = e.dataTransfer.getData('text/plain');
     const imgRect = getImageArea();
     if (!imgRect) return;
-    const x = e.clientX - imgRect.left;
-    const y = e.clientY - imgRect.top;
+    const x = e.clientX - imgRect.x;
+    const y = e.clientY - imgRect.y;
     const xPct = x / imgRect.width;
     const yPct = y / imgRect.height;
     if (dataType === 'placed-light' && draggedPlacedLight) {
@@ -193,8 +210,8 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   const renderLight = useCallback((light: PlacedLight) => {
     const imgRect = getImageArea();
     if (!imgRect) return null;
-    const x = light.xPct * imgRect.width + imgRect.left - imgRect.left;
-    const y = light.yPct * imgRect.height + imgRect.top - imgRect.top;
+    const x = imgRect.x + light.xPct * imgRect.width;
+    const y = imgRect.y + light.yPct * imgRect.height;
     const colors = {
       solo: ['#ff0000'],
       duo: ['#ff0000', '#0000ff'],
@@ -205,8 +222,8 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
         key={light.id}
         className="absolute cursor-move group select-none"
         style={{
-          left: `${light.xPct * 100}%`,
-          top: `${light.yPct * 100}%`,
+          left: x - imgRect.x,
+          top: y - imgRect.y,
           transform: 'translate(-50%, -50%)',
           zIndex: draggedPlacedLight === light.id ? 1000 : 10
         }}
@@ -248,7 +265,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
         </div>
       </div>
       
-      <div className="relative">
+      <div className="relative" id="vehicle-img-container">
         <canvas
           ref={canvasRef}
           width={800}
