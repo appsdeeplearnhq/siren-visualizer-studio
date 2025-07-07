@@ -3,7 +3,6 @@ import { Badge } from "@/components/ui/badge";
 
 interface LightingToolboxProps {
   onLightSelect: (lightType: string) => void;
-  view: string;
 }
 
 const lightTypes = [
@@ -27,7 +26,7 @@ const lightTypes = [
   }
 ];
 
-export const LightingToolbox = ({ onLightSelect, view }: LightingToolboxProps) => {
+export const LightingToolbox = ({ onLightSelect }: LightingToolboxProps) => {
   const handleDragStart = (e: React.DragEvent, lightType: string) => {
     e.dataTransfer.setData('text/plain', lightType);
     e.dataTransfer.effectAllowed = 'copy';
@@ -67,7 +66,7 @@ export const LightingToolbox = ({ onLightSelect, view }: LightingToolboxProps) =
         {lightTypes.map((light) => (
           <div
             key={light.id}
-            className="p-3 rounded-lg bg-secondary hover:bg-surface-elevated cursor-grab active:cursor-grabbing transition-colors border border-border select-none"
+            className="flex items-center justify-between p-3 rounded-lg bg-secondary hover:bg-surface-elevated cursor-grab active:cursor-grabbing transition-colors border border-border select-none"
             draggable
             onDragStart={(e) => handleDragStart(e, light.id)}
             onClick={() => onLightSelect(light.id)}
@@ -76,7 +75,7 @@ export const LightingToolbox = ({ onLightSelect, view }: LightingToolboxProps) =
               <p className="font-medium text-foreground">{light.name}</p>
               <p className="text-sm text-muted-foreground">{light.description}</p>
             </div>
-            <div className={`flex ${view === 'top' && light.colors.length > 1 ? 'flex-col' : ''}`} style={{ gap: '2px' }}>
+            <div className={`flex ${light.colors.length > 1 ? 'flex-col' : ''}`} style={{ gap: '2px' }}>
               {light.colors.map((color, index) => (
                 <div
                   key={index}
