@@ -3,6 +3,16 @@ import html2canvas from "html2canvas";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Trash2 } from "lucide-react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription, 
+  DialogFooter 
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import chevyTahoeImage from "@/assets/chevy-tahoe-front.jpg";
 
 interface PlacedLight {
@@ -25,6 +35,8 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   const [placedLights, setPlacedLights] = useState<PlacedLight[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [vehicleImageLoaded, setVehicleImageLoaded] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [clientName, setClientName] = useState("");
   
   // State to hold the light being dragged from its original position
   const [activelyDraggedLight, setActivelyDraggedLight] = useState<PlacedLight | null>(null);
@@ -122,23 +134,44 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   const clearAll = () => setPlacedLights([]);
   
   const handleExport = useCallback(async () => {
+    if (!clientName.trim()) {
+      alert("Please enter a client name.");
+      return;
+    }
+    
     const diagramElement = document.getElementById('vehicle-diagram-export-area');
     if (!diagramElement) {
       console.error("Export failed: Diagram element not found.");
+      setIsExporting(false);
       return;
     }
 
     try {
       const canvas = await html2canvas(diagramElement, {
-        backgroundColor: null, // Use transparent background
+        backgroundColor: null,
         logging: false,
-        useCORS: true // Important for external images
+        useCORS: true,
       });
+
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.font = 'bold 24px Arial';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        const text = clientName;
+        const textMetrics = ctx.measureText(text);
+        const x = canvas.width - textMetrics.width - 20;
+        const y = canvas.height - 20;
+        ctx.fillText(text, x, y);
+      }
+      
       onExport(canvas);
     } catch (error) {
       console.error("Export failed:", error);
+    } finally {
+      setIsExporting(false);
+      setClientName("");
     }
-  }, [onExport]);
+  }, [onExport, clientName]);
 
   return (
     <Card className="p-4 bg-card border-border flex-1" onDragEnd={handleDragEnd}>
@@ -148,9 +181,38 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
         </h3>
         <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={clearAll}><Trash2 className="w-4 h-4 mr-2" />Clear All</Button>
-            <Button size="sm" onClick={handleExport}><Download className="w-4 h-4 mr-2" />Export</Button>
+            <Button size="sm" onClick={() => setIsExporting(true)}><Download className="w-4 h-4 mr-2" />Export</Button>
         </div>
       </div>
+
+      <Dialog open={isExporting} onOpenChange={setIsExporting}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enter Client Name</DialogTitle>
+            <DialogDescription>
+              Please enter the client's name to add it to the exported image.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="client-name" className="text-right">
+                Client Name
+              </Label>
+              <Input
+                id="client-name"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                className="col-span-3"
+                placeholder="e.g., John Doe"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsExporting(false)}>Cancel</Button>
+            <Button onClick={handleExport}>Confirm & Export</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <div className="relative w-full h-full">
         <canvas
