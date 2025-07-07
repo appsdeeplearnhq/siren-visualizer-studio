@@ -77,7 +77,16 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     const xPct = x_rel_img / imgRect.width;
     const yPct = y_rel_img / imgRect.height;
     
-    setPlacedLights(prev => prev.map(l => l.id === draggedLightId ? { ...l, xPct, yPct } : l));
+    if (draggedLightId) {
+      // Redrag: update existing light
+      setPlacedLights(prev => prev.map(l => l.id === draggedLightId ? { ...l, xPct, yPct } : l));
+    } else {
+      // New light from toolbox
+      setPlacedLights(prev => [
+        ...prev,
+        { id: Date.now().toString(), type: dataType, xPct, yPct }
+      ]);
+    }
     setDraggedLightId(null);
 
   }, [draggedLightId, vehicleImageLoaded]);
