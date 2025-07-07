@@ -210,12 +210,14 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
         <img
           src={chevyTahoeImage}
           alt="Chevy Tahoe Front View"
-          className="absolute inset-4 w-auto h-auto max-w-full max-h-full object-contain m-auto"
+          className="absolute w-auto h-auto object-contain"
           style={{ 
             pointerEvents: 'none',
             left: '50%',
             top: '50%',
-            transform: 'translate(-50%, -50%)'
+            transform: 'translate(-50%, -50%)',
+            maxWidth: 'calc(100% - 32px)',
+            maxHeight: 'calc(100% - 32px)'
           }}
           draggable={false}
         />
