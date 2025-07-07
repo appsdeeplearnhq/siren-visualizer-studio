@@ -85,21 +85,34 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
 
   // Unified drop handler (DOM)
   const LIGHT_RADIUS = 12; // px, must match canvas and DOM
+  const LIGHT_SPACING = 25; // px, must match canvas and DOM
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     const dataType = e.dataTransfer.getData('text/plain');
     const imgRect = getImageArea();
     if (!imgRect) return;
-    // Subtract half the light size to center the light under the cursor
-    const x = e.clientX - imgRect.x - LIGHT_RADIUS;
+    // Center the light group under the cursor
+    let numCircles = 1;
+    if (dataType === 'duo') numCircles = 2;
+    if (dataType === 'trio') numCircles = 3;
+    const groupWidth = numCircles * LIGHT_SPACING;
+    const x = e.clientX - imgRect.x - groupWidth / 2 + LIGHT_SPACING / 2;
     const y = e.clientY - imgRect.y - LIGHT_RADIUS;
-    const xPct = (x + LIGHT_RADIUS) / imgRect.width;
+    const xPct = (x + groupWidth / 2 - LIGHT_SPACING / 2) / imgRect.width;
     const yPct = (y + LIGHT_RADIUS) / imgRect.height;
     if (dataType === 'placed-light' && draggedPlacedLight) {
+      // Find the type of the dragged light
+      const dragged = placedLights.find(l => l.id === draggedPlacedLight);
+      let n = 1;
+      if (dragged?.type === 'duo') n = 2;
+      if (dragged?.type === 'trio') n = 3;
+      const groupW = n * LIGHT_SPACING;
+      const x2 = e.clientX - imgRect.x - groupW / 2 + LIGHT_SPACING / 2;
+      const xPct2 = (x2 + groupW / 2 - LIGHT_SPACING / 2) / imgRect.width;
       setPlacedLights(prev => prev.map(light =>
         light.id === draggedPlacedLight
-          ? { ...light, xPct, yPct }
+          ? { ...light, xPct: xPct2, yPct }
           : light
       ));
       setDraggedPlacedLight(null);
@@ -112,7 +125,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
       };
       setPlacedLights(prev => [...prev, newLight]);
     }
-  }, [draggedPlacedLight]);
+  }, [draggedPlacedLight, placedLights]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -217,6 +230,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
       duo: ['#ff0000', '#0000ff'],
       trio: ['#ff0000', '#0000ff', '#ffffff']
     };
+    const lightColors = colors[light.type as keyof typeof colors] || ['#ff0000'];
     return (
       <div
         key={light.id}
@@ -224,7 +238,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
         style={{
           left: x - imgRect.x,
           top: y - imgRect.y,
-          width: LIGHT_RADIUS * 2,
+          width: lightColors.length * LIGHT_SPACING,
           height: LIGHT_RADIUS * 2,
           transform: 'translate(-50%, -50%)',
           zIndex: draggedPlacedLight === light.id ? 1000 : 10
@@ -233,16 +247,32 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
         onDragStart={(e) => handleLightDragStart(e, light.id)}
         onDoubleClick={() => removeLight(light.id)}
       >
-        <div className="flex gap-0.5">
-          {colors[light.type as keyof typeof colors]?.map((color, index) => (
+        {/* Render each circle absolutely to prevent flex/rectangle bug */}
+        <div style={{ position: 'relative', width: lightColors.length * LIGHT_SPACING, height: LIGHT_RADIUS * 2 }}>
+          {lightColors.map((color, index) => (
             <div
               key={index}
-              className="w-6 h-6 rounded-full border-2 border-white shadow-lg transition-transform group-hover:scale-110"
-              style={{ backgroundColor: color }}
+              style={{
+                position: 'absolute',
+                left: index * LIGHT_SPACING,
+                top: 0,
+                width: LIGHT_RADIUS * 2,
+                height: LIGHT_RADIUS * 2,
+                borderRadius: '50%',
+                backgroundColor: color,
+                border: '2px solid #fff',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                transition: 'transform 0.1s',
+                pointerEvents: 'auto',
+              }}
+              className="shadow-lg group-hover:scale-110"
             />
           ))}
         </div>
-        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+        <div
+          className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
+          style={{ pointerEvents: 'none', zIndex: 1 }}
+        >
           Drag to move • Double-click to remove
         </div>
       </div>
