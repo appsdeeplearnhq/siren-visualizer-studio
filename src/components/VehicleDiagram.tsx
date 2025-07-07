@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from "react";
+import html2canvas from "html2canvas";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Trash2 } from "lucide-react";
@@ -33,9 +34,9 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     if (!container || !img || !vehicleImageLoaded || img.naturalWidth === 0) return null;
     
     const containerRect = container.getBoundingClientRect();
-    const padding = 32;
-    const maxWidth = containerRect.width - padding;
-    const maxHeight = containerRect.height - padding;
+    const padding = 32; // Padding on a single side
+    const maxWidth = containerRect.width - padding * 2; // Apply padding to both sides
+    const maxHeight = containerRect.height - padding * 2; // Apply padding to top and bottom
     
     const scale = Math.min(maxWidth / img.naturalWidth, maxHeight / img.naturalHeight);
     const imgWidth = img.naturalWidth * scale;
@@ -126,74 +127,24 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   const removeLight = (lightId: string) => setPlacedLights(prev => prev.filter(light => light.id !== lightId));
   const clearAll = () => setPlacedLights([]);
   
-  const getCanvasImageArea = (canvas: HTMLCanvasElement, img: HTMLImageElement) => {
-    const padding = 32;
-    const canvasWidth = canvas.width;
-    const canvasHeight = canvas.height;
-    let { width: imgWidth, height: imgHeight } = img;
-    const maxWidth = canvasWidth - padding;
-    const maxHeight = canvasHeight - padding;
-    const scale = Math.min(maxWidth / imgWidth, maxHeight / imgHeight);
-    imgWidth *= scale;
-    imgHeight *= scale;
-    const imageX = (canvasWidth - imgWidth) / 2;
-    const imageY = (canvasHeight - imgHeight) / 2;
-    return { x: imageX, y: imageY, width: imgWidth, height: imgHeight };
-  };
-
   const handleExport = useCallback(async () => {
-    const exportCanvas = document.createElement('canvas');
-    const img = imgRef.current;
-    if (!img || !vehicleImageLoaded) return;
-    
-    const vehicleImg = new Image();
-    vehicleImg.crossOrigin = "Anonymous";
-    vehicleImg.src = chevyTahoeImage;
+    const diagramElement = document.getElementById('vehicle-diagram-export-area');
+    if (!diagramElement) {
+      console.error("Export failed: Diagram element not found.");
+      return;
+    }
 
-    vehicleImg.onload = () => {
-        exportCanvas.width = vehicleImg.naturalWidth;
-        exportCanvas.height = vehicleImg.naturalHeight;
-        const ctx = exportCanvas.getContext('2d');
-        if (!ctx) return;
-        
-        // Draw the vehicle image to fill the canvas
-        ctx.drawImage(vehicleImg, 0, 0, exportCanvas.width, exportCanvas.height);
-
-        // Draw the lights
-        placedLights.forEach(light => {
-            const LIGHT_RADIUS = (24 / 2) * (exportCanvas.width / (getImageArea()?.width || exportCanvas.width));
-            const LIGHT_SPACING = (25) * (exportCanvas.width / (getImageArea()?.width || exportCanvas.width));
-            
-            const x = light.xPct * exportCanvas.width;
-            const y = light.yPct * exportCanvas.height;
-
-            const colors = {
-                solo: ['#ff0000'],
-                duo: ['#ff0000', '#0000ff'],
-                trio: ['#ff0000', '#0000ff', '#ffffff']
-            };
-            const lightColors = colors[light.type as keyof typeof colors] || [];
-            const n = lightColors.length;
-            const totalWidth = (n - 1) * LIGHT_SPACING;
-            
-            for (let i = 0; i < n; i++) {
-                ctx.beginPath();
-                const circleX = x - totalWidth / 2 + i * LIGHT_SPACING;
-                ctx.arc(circleX, y, LIGHT_RADIUS, 0, 2 * Math.PI, false);
-                ctx.fillStyle = lightColors[i];
-                ctx.fill();
-                ctx.lineWidth = 2 * (exportCanvas.width / (getImageArea()?.width || exportCanvas.width));
-                ctx.strokeStyle = '#fff';
-                ctx.stroke();
-            }
-        });
-        
-        onExport(exportCanvas);
-    };
-    vehicleImg.onerror = () => {
-        console.error("Failed to load vehicle image for export.");
-    };
-  }, [placedLights, onExport, vehicleImageLoaded, getImageArea]);
+    try {
+      const canvas = await html2canvas(diagramElement, {
+        backgroundColor: null, // Use transparent background
+        logging: false,
+        useCORS: true // Important for external images
+      });
+      onExport(canvas);
+    } catch (error) {
+      console.error("Export failed:", error);
+    }
+  }, [onExport]);
 
   return (
     <Card className="p-4 bg-card border-border flex-1" onDragEnd={handleDragEnd}>
@@ -220,7 +171,12 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
           style={{ minHeight: '400px' }}
         />
         
-        <div className="absolute top-0 left-0 w-full h-full" style={{ pointerEvents: 'none' }}>
+        <div 
+          id="vehicle-diagram-export-area"
+          className="absolute top-0 left-0 w-full h-full p-8 flex items-center justify-center"
+          style={{ pointerEvents: 'none' }}
+        >
+          <div className="relative w-full h-full">
             <img
               ref={imgRef}
               id="vehicle-img-dom"
@@ -231,8 +187,8 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
                 left: '50%', 
                 top: '50%',
                 transform: 'translate(-50%, -50%)',
-                maxWidth: 'calc(100% - 64px)',
-                maxHeight: 'calc(100% - 64px)',
+                width: '100%',
+                height: '100%',
               }}
               onLoad={() => setVehicleImageLoaded(true)}
             />
@@ -282,6 +238,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
                     </div>
                 );
             })}
+          </div>
         </div>
       </div>
     </Card>
