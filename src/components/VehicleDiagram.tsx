@@ -84,18 +84,19 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   };
 
   // Unified drop handler (DOM)
+  const LIGHT_RADIUS = 12; // px, must match canvas and DOM
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     const dataType = e.dataTransfer.getData('text/plain');
     const imgRect = getImageArea();
     if (!imgRect) return;
-    const x = e.clientX - imgRect.x;
-    const y = e.clientY - imgRect.y;
-    const xPct = x / imgRect.width;
-    const yPct = y / imgRect.height;
+    // Subtract half the light size to center the light under the cursor
+    const x = e.clientX - imgRect.x - LIGHT_RADIUS;
+    const y = e.clientY - imgRect.y - LIGHT_RADIUS;
+    const xPct = (x + LIGHT_RADIUS) / imgRect.width;
+    const yPct = (y + LIGHT_RADIUS) / imgRect.height;
     if (dataType === 'placed-light' && draggedPlacedLight) {
-      // Moving existing light
       setPlacedLights(prev => prev.map(light =>
         light.id === draggedPlacedLight
           ? { ...light, xPct, yPct }
@@ -103,7 +104,6 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
       ));
       setDraggedPlacedLight(null);
     } else if (dataType && dataType !== 'placed-light') {
-      // Adding new light
       const newLight: PlacedLight = {
         id: Date.now().toString(),
         type: dataType,
@@ -224,6 +224,8 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
         style={{
           left: x - imgRect.x,
           top: y - imgRect.y,
+          width: LIGHT_RADIUS * 2,
+          height: LIGHT_RADIUS * 2,
           transform: 'translate(-50%, -50%)',
           zIndex: draggedPlacedLight === light.id ? 1000 : 10
         }}
