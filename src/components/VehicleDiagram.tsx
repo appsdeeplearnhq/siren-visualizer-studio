@@ -20,6 +20,7 @@ interface VehicleDiagramProps {
 
 export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null); // Ref for the DOM image
   const [placedLights, setPlacedLights] = useState<PlacedLight[]>([]);
   const [draggedLight, setDraggedLight] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -27,6 +28,17 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [vehicleImageLoaded, setVehicleImageLoaded] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  const [isReDragging, setIsReDragging] = useState(false);
+
+  // Add a global dragend listener to reset state
+  useEffect(() => {
+    const handleDragEnd = () => {
+      setIsReDragging(false);
+      setDraggedPlacedLight(null);
+    };
+    document.addEventListener('dragend', handleDragEnd);
+    return () => document.removeEventListener('dragend', handleDragEnd);
+  }, []);
 
   // Handle canvas resize
   useEffect(() => {
@@ -43,14 +55,14 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
   }, []);
 
   // Helper to get image area in DOM (match canvas logic)
-  const getImageArea = () => {
-    const container = document.getElementById('vehicle-img-container');
-    const img = document.getElementById('vehicle-img-dom') as HTMLImageElement;
-    if (!container || !img) return null;
+  const getImageArea = useCallback(() => {
+    const container = canvasRef.current; // Use canvas as the container
+    const img = imgRef.current;
+    if (!container || !img || !vehicleImageLoaded) return null;
     const containerRect = container.getBoundingClientRect();
-    // Use naturalWidth/naturalHeight for scaling
     let imgWidth = img.naturalWidth;
     let imgHeight = img.naturalHeight;
+    if (imgWidth === 0 || imgHeight === 0) return null;
     const padding = 32;
     const maxWidth = containerRect.width - padding;
     const maxHeight = containerRect.height - padding;
@@ -63,9 +75,11 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
       x: containerRect.left + imageX,
       y: containerRect.top + imageY,
       width: imgWidth,
-      height: imgHeight
+      height: imgHeight,
+      relativeX: imageX,
+      relativeY: imageY,
     };
-  };
+  }, [vehicleImageLoaded]);
 
   // Helper to get image area in canvas
   const getCanvasImageArea = (canvas: HTMLCanvasElement, img: HTMLImageElement) => {
@@ -83,35 +97,35 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     return { x: imageX, y: imageY, width: imgWidth, height: imgHeight };
   };
 
-  // Unified drop handler (DOM)
+  // Unified drop handler using relative coordinates
   const LIGHT_RADIUS = 12; // px, must match canvas and DOM
   const LIGHT_SPACING = 25; // px, must match canvas and DOM
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
+    setIsReDragging(false);
     const dataType = e.dataTransfer.getData('text/plain');
-    const imgRect = getImageArea();
-    if (!imgRect) return;
-    // Center the group at the cursor
-    let numCircles = 1;
-    if (dataType === 'duo') numCircles = 2;
-    if (dataType === 'trio') numCircles = 3;
-    const groupWidth = (numCircles - 1) * LIGHT_SPACING;
-    const x = e.clientX - imgRect.x;
-    const y = e.clientY - imgRect.y;
-    // The center of the group should be at the cursor
-    const xPct = (x) / imgRect.width;
-    const yPct = (y) / imgRect.height;
+    const imgArea = getImageArea();
+    if (!imgArea) return;
+    const dropX = e.nativeEvent.offsetX;
+    const dropY = e.nativeEvent.offsetY;
+    const x_rel_img = dropX - imgArea.relativeX;
+    const y_rel_img = dropY - imgArea.relativeY;
+    if (x_rel_img < 0 || x_rel_img > imgArea.width || y_rel_img < 0 || y_rel_img > imgArea.height) {
+      return; // Drop was outside the image
+    }
+    const xPct = x_rel_img / imgArea.width;
+    const yPct = y_rel_img / imgArea.height;
     if (dataType === 'placed-light' && draggedPlacedLight) {
       // Find the type of the dragged light
       const dragged = placedLights.find(l => l.id === draggedPlacedLight);
       let n = 1;
       if (dragged?.type === 'duo') n = 2;
       if (dragged?.type === 'trio') n = 3;
-      const x2 = e.clientX - imgRect.x;
-      const y2 = e.clientY - imgRect.y;
-      const xPct2 = (x2) / imgRect.width;
-      const yPct2 = (y2) / imgRect.height;
+      const x2 = dropX - imgArea.relativeX;
+      const y2 = dropY - imgArea.relativeY;
+      const xPct2 = x2 / imgArea.width;
+      const yPct2 = y2 / imgArea.height;
       setPlacedLights(prev => prev.map(light =>
         light.id === draggedPlacedLight
           ? { ...light, xPct: xPct2, yPct: yPct2 }
@@ -127,7 +141,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
       };
       setPlacedLights(prev => [...prev, newLight]);
     }
-  }, [draggedPlacedLight, placedLights]);
+  }, [draggedPlacedLight, placedLights, getImageArea]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -219,67 +233,60 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     setDraggedPlacedLight(lightId);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', 'placed-light');
+    setTimeout(() => setIsReDragging(true), 0);
   }, []);
 
   // DOM render helper
   const renderLight = useCallback((light: PlacedLight) => {
-    const imgRect = getImageArea();
-    if (!imgRect) return null;
-    const x = imgRect.x + light.xPct * imgRect.width;
-    const y = imgRect.y + light.yPct * imgRect.height;
+    const imgArea = getImageArea();
+    if (!imgArea) return null;
     const colors = {
       solo: ['#ff0000'],
       duo: ['#ff0000', '#0000ff'],
       trio: ['#ff0000', '#0000ff', '#ffffff']
     };
     const lightColors = colors[light.type as keyof typeof colors] || ['#ff0000'];
+    const lightGroupWidth = (lightColors.length - 1) * 25 + 24;
     return (
       <div
         key={light.id}
         className="absolute cursor-move group select-none"
         style={{
-          left: x - imgRect.x,
-          top: y - imgRect.y,
-          width: lightColors.length * LIGHT_SPACING,
-          height: LIGHT_RADIUS * 2,
+          left: `${light.xPct * 100}%`,
+          top: `${light.yPct * 100}%`,
           transform: 'translate(-50%, -50%)',
-          zIndex: draggedPlacedLight === light.id ? 1000 : 10
+          zIndex: 20, // ensure lights are on top
+          opacity: isReDragging && draggedPlacedLight === light.id ? 0 : 1,
         }}
         draggable
         onDragStart={(e) => handleLightDragStart(e, light.id)}
         onDoubleClick={() => removeLight(light.id)}
       >
-        {/* Render each circle absolutely to prevent flex/rectangle bug */}
-        <div style={{ position: 'relative', width: lightColors.length * LIGHT_SPACING, height: LIGHT_RADIUS * 2 }}>
+        <div className="flex items-center" style={{ gap: '1px', width: lightGroupWidth, pointerEvents: 'none' }}>
           {lightColors.map((color, index) => (
             <div
               key={index}
               style={{
-                position: 'absolute',
-                left: index * LIGHT_SPACING,
-                top: 0,
-                width: LIGHT_RADIUS * 2,
-                height: LIGHT_RADIUS * 2,
+                width: '24px',
+                height: '24px',
                 borderRadius: '50%',
                 backgroundColor: color,
                 border: '2px solid #fff',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                transition: 'transform 0.1s',
-                pointerEvents: 'auto',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
               }}
-              className="shadow-lg group-hover:scale-110"
+              className="transition-transform group-hover:scale-110"
             />
           ))}
         </div>
         <div
-          className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
+          className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100"
           style={{ pointerEvents: 'none', zIndex: 1 }}
         >
           Drag to move • Double-click to remove
         </div>
       </div>
     );
-  }, [draggedPlacedLight, handleLightDragStart, removeLight]);
+  }, [draggedPlacedLight, getImageArea, handleLightDragStart, removeLight, isReDragging]);
 
   return (
     <Card className="p-4 bg-card border-border flex-1">
@@ -315,6 +322,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
         />
         {/* Vehicle Image */}
         <img
+          ref={imgRef}
           id="vehicle-img-dom"
           src={chevyTahoeImage}
           alt="Chevy Tahoe Front View"
@@ -331,8 +339,9 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
           onLoad={() => setVehicleImageLoaded(true)}
           onError={() => setVehicleImageLoaded(false)}
         />
-        {/* Placed lights */}
-        {placedLights.map(renderLight)}
+        <div className="absolute top-0 left-0 w-full h-full" style={{ pointerEvents: 'none' }}>
+          {placedLights.map(renderLight)}
+        </div>
       </div>
       
       <div className="mt-4 text-sm text-muted-foreground">
