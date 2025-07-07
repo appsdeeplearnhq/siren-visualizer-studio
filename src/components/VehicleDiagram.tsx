@@ -155,12 +155,23 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
 
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.font = 'bold 24px Arial';
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        const padding = Math.max(20, canvas.width / 50); // Add responsive padding
+        const fontSize = Math.max(24, canvas.width / 40); // Make font size responsive
+        
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+
+        // Add a subtle shadow for better legibility
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+
         const text = clientName;
-        const textMetrics = ctx.measureText(text);
-        const x = canvas.width - textMetrics.width - 20;
-        const y = canvas.height - 20;
+        const x = canvas.width - padding;
+        const y = canvas.height - padding;
         ctx.fillText(text, x, y);
       }
       
