@@ -98,9 +98,17 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     
     return new Promise<void>((resolve) => {
       img.onload = () => {
-        // Calculate centered position and size
+        // Get canvas dimensions and calculate scale
+        const canvasRect = canvas.getBoundingClientRect();
         const canvasWidth = canvas.width;
         const canvasHeight = canvas.height;
+        const displayWidth = canvasRect.width;
+        const displayHeight = canvasRect.height;
+        
+        // Calculate scale factors for positioning
+        const scaleX = canvasWidth / displayWidth;
+        const scaleY = canvasHeight / displayHeight;
+        
         const padding = 32;
         const maxWidth = canvasWidth - padding;
         const maxHeight = canvasHeight - padding;
@@ -112,12 +120,12 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
         imgWidth *= scale;
         imgHeight *= scale;
         
-        const x = (canvasWidth - imgWidth) / 2;
-        const y = (canvasHeight - imgHeight) / 2;
+        const imageX = (canvasWidth - imgWidth) / 2;
+        const imageY = (canvasHeight - imgHeight) / 2;
         
-        ctx.drawImage(img, x, y, imgWidth, imgHeight);
+        ctx.drawImage(img, imageX, imageY, imgWidth, imgHeight);
 
-        // Draw lights
+        // Draw lights with correct positioning
         placedLights.forEach(light => {
           const colors = {
             solo: ['#ff0000'],
@@ -127,17 +135,21 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
 
           const lightColors = colors[light.type as keyof typeof colors] || ['#ff0000'];
           
+          // Convert display coordinates to canvas coordinates
+          const canvasX = light.x * scaleX;
+          const canvasY = light.y * scaleY;
+          
           lightColors.forEach((color, index) => {
-            const lightX = light.x + (index * 25) - (lightColors.length * 12.5);
-            const lightY = light.y;
+            const lightX = canvasX + (index * 25 * scaleX) - (lightColors.length * 12.5 * scaleX);
+            const lightY = canvasY;
             
             // Draw light circle
             ctx.beginPath();
-            ctx.arc(lightX, lightY, 12, 0, 2 * Math.PI);
+            ctx.arc(lightX, lightY, 12 * scaleX, 0, 2 * Math.PI);
             ctx.fillStyle = color;
             ctx.fill();
             ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2 * scaleX;
             ctx.stroke();
           });
         });
