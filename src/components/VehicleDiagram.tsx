@@ -3,7 +3,8 @@ import html2canvas from "html2canvas";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Trash2 } from "lucide-react";
-import chevyTahoeImage from "@/assets/chevy-tahoe-front.jpg";
+import chevyTahoeFrontImage from "@/assets/chevy-tahoe-front.jpg";
+import chevyTahoeTopImage from "@/assets/chevy-tahoe-top.png";
 
 interface PlacedLight {
   id: string;
@@ -140,6 +141,16 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
     }
   }, [onExport]);
 
+  // Normalize for comparison
+  const normalizedVehicle = vehicle.trim().toLowerCase();
+  const normalizedView = view.trim().toLowerCase();
+
+  // Select image based on view
+  let vehicleImage = chevyTahoeFrontImage;
+  if (normalizedVehicle.includes("tahoe") && normalizedView === "top") {
+    vehicleImage = chevyTahoeTopImage;
+  }
+
   return (
     <Card className="p-4 bg-card border-border flex-1" onDragEnd={handleDragEnd}>
       <div className="flex justify-between items-center mb-4">
@@ -174,18 +185,18 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
             <img
               ref={imgRef}
               id="vehicle-img-dom"
-          src={chevyTahoeImage}
+              src={vehicleImage}
               alt="Vehicle"
               className="absolute object-contain"
-          style={{ 
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
+              style={{
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
                 width: '100%',
                 height: '100%',
-          }}
-          onLoad={() => setVehicleImageLoaded(true)}
-        />
+              }}
+              onLoad={() => setVehicleImageLoaded(true)}
+            />
         
             {/* Render placed lights */}
             {placedLights.map(light => {
