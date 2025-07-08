@@ -4,7 +4,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Trash2 } from "lucide-react";
 import chevyTahoeImage from "@/assets/chevy-tahoe-front.jpg";
-import chevyTahoeTopImage from "@/assets/chevy-tahoe-top.png";
 
 interface PlacedLight {
   id: string;
@@ -175,18 +174,18 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
             <img
               ref={imgRef}
               id="vehicle-img-dom"
-              src={view === 'top' ? chevyTahoeTopImage : chevyTahoeImage}
+          src={chevyTahoeImage}
               alt="Vehicle"
               className="absolute object-contain"
-              style={{ 
-                left: '50%', 
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
+          style={{ 
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
                 width: '100%',
                 height: '100%',
-              }}
-              onLoad={() => setVehicleImageLoaded(true)}
-            />
+          }}
+          onLoad={() => setVehicleImageLoaded(true)}
+        />
         
             {/* Render placed lights */}
             {placedLights.map(light => {
@@ -196,7 +195,7 @@ export const VehicleDiagram = ({ view, vehicle, onExport }: VehicleDiagramProps)
                 const colors = {
                     solo: ['#ff0000'],
                     duo: ['#ff0000', '#0000ff'],
-                    trio: ['#ff0000', '#0000ff', '#ffffff']
+                    trio: ['#ff0000', '#0000ff', '#000000'] // changed from #ffffff to #000000
                 };
                 const lightColors = colors[light.type as keyof typeof colors] || [];
 

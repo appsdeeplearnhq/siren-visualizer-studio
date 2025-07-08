@@ -21,7 +21,7 @@ const lightTypes = [
   {
     id: 'trio',
     name: 'Trio RGB',
-    colors: ['red', 'blue', 'white'],
+    colors: ['red', 'blue', 'black'],
     description: 'Red, blue, and white emergency light'
   }
 ];
@@ -47,7 +47,7 @@ export const LightingToolbox = ({ onLightSelect }: LightingToolboxProps) => {
               light.colors.forEach((color) => {
                 const circle = document.createElement('div');
                 circle.className = `w-8 h-8 rounded-full border-2 border-white shadow-lg`;
-                circle.style.backgroundColor = color === 'red' ? '#ff0000' : color === 'blue' ? '#0000ff' : '#ffffff';
+                circle.style.backgroundColor = color === 'red' ? '#ff0000' : color === 'blue' ? '#0000ff' : '#000000';
                 if (color === 'white') circle.style.border = '2px solid #ccc';
                 dragImage.appendChild(circle);
               });
@@ -78,7 +78,7 @@ export const LightingToolbox = ({ onLightSelect }: LightingToolboxProps) => {
                     className={`w-3 h-3 rounded-full ${
                       color === 'red' ? 'bg-emergency-red' :
                       color === 'blue' ? 'bg-emergency-blue' :
-                      'bg-emergency-white border border-border'
+                      'bg-black border border-border'
                     }`}
                   />
                 ))}
